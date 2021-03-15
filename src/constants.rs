@@ -3,13 +3,14 @@ use num_derive::{FromPrimitive, ToPrimitive};
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum Type {
     Bytes = 1,
+    None,
     Map,
     Sequence,
-    Option,
     String,
     Bool,
     F32,
     F64,
+    I8,
     I16,
     I32,
     I64,
@@ -30,3 +31,5 @@ pub const MAP_BEGIN: u8 = b'{';
 pub const MAP_END: u8 = b'{';
 pub const STRING_BEGIN: u8 = b'"';
 pub const STRING_END: u8 = b'"';
+pub const TRUE: [u8; 1] = [1];
+pub const FALSE: [u8; 1] = [0];

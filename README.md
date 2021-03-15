@@ -1,3 +1,3 @@
 # Tinychain Binary Object Notation
 
-Tinychain Binary Object Notation (TBON) is a compact and versatile streaming-friendly binary serialization format.
+Tinychain Binary Object Notation (TBON) is a compact and versatile stream-friendly binary serialization format.

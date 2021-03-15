@@ -3,7 +3,7 @@ name = "tbon"
 version = "0.1.0"
 authors = ["haydnv"]
 edition = "2018"
-description = "Tinychain Binary Object Notation is a compact and versatile streaming-friendly binary serialization format"
+description = "Tinychain Binary Object Notation is a compact and versatile stream-friendly binary serialization format"
 repository = "http://github.com/haydnv/tbon"
 readme = "README.md"
 

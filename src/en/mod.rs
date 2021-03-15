@@ -6,6 +6,7 @@ use std::pin::Pin;
 use destream::en;
 use futures::future;
 use futures::stream::{Stream, StreamExt};
+use num_traits::ToPrimitive;
 
 use super::constants::*;
 
@@ -190,6 +191,29 @@ impl<'en> en::EncodeTuple<'en> for SequenceEncoder<'en> {
 
 pub struct Encoder;
 
+impl Encoder {
+    #[inline]
+    fn encode_type<'en>(&self, dtype: &Type, value: Vec<u8>) -> Result<ByteStream<'en>, Error> {
+        Ok(Box::pin(
+            futures::stream::iter(vec![vec![dtype.to_u8().unwrap()], value]).map(Ok),
+        ))
+    }
+
+    #[inline]
+    fn encode_string_type<'en>(
+        &self,
+        dtype: &Type,
+        start: u8,
+        value: Vec<u8>,
+        end: u8,
+    ) -> Result<ByteStream<'en>, Error> {
+        Ok(Box::pin(
+            futures::stream::iter(vec![vec![dtype.to_u8().unwrap(), start], value, vec![end]])
+                .map(Ok),
+        ))
+    }
+}
+
 impl<'en> en::Encoder<'en> for Encoder {
     type Ok = ByteStream<'en>;
     type Error = Error;
@@ -197,68 +221,91 @@ impl<'en> en::Encoder<'en> for Encoder {
     type EncodeSeq = SequenceEncoder<'en>;
     type EncodeTuple = SequenceEncoder<'en>;
 
-    fn encode_bool(self, _v: bool) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
+        let value = if v { TRUE } else { FALSE };
+        self.encode_type(&Type::Bool, value.to_vec())
     }
 
-    fn encode_i8(self, _v: i8) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::I8, v.to_be_bytes().to_vec())
     }
 
-    fn encode_i16(self, _v: i16) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    fn encode_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::I16, v.to_be_bytes().to_vec())
     }
 
-    fn encode_i32(self, _v: i32) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::I32, v.to_be_bytes().to_vec())
     }
 
-    fn encode_i64(self, _v: i64) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::I64, v.to_be_bytes().to_vec())
     }
 
-    fn encode_u8(self, _v: u8) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::U8, v.to_be_bytes().to_vec())
     }
 
-    fn encode_u16(self, _v: u16) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::U16, v.to_be_bytes().to_vec())
     }
 
-    fn encode_u32(self, _v: u32) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::U32, v.to_be_bytes().to_vec())
     }
 
-    fn encode_u64(self, _v: u64) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::U64, v.to_be_bytes().to_vec())
     }
 
-    fn encode_f32(self, _v: f32) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::F32, v.to_be_bytes().to_vec())
     }
 
-    fn encode_f64(self, _v: f64) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
+        self.encode_type(&Type::F64, v.to_be_bytes().to_vec())
     }
 
-    fn encode_str(self, _v: &str) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
+        self.encode_string_type(
+            &Type::String,
+            STRING_BEGIN,
+            v.as_bytes().to_vec(),
+            STRING_END,
+        )
     }
 
-    fn encode_bytes(self, _v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
+        self.encode_string_type(&Type::String, BITSTRING_BEGIN, v.to_vec(), BITSTRING_END)
     }
 
+    #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+        Ok(Box::pin(futures::stream::once(future::ready(Ok(vec![
+            (&Type::None).to_u8().unwrap(),
+        ])))))
     }
 
-    fn encode_some<T: en::IntoStream<'en> + 'en>(self, _value: T) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+    #[inline]
+    fn encode_some<T: en::IntoStream<'en> + 'en>(self, value: T) -> Result<Self::Ok, Self::Error> {
+        value.into_stream(self)
     }
 
+    #[inline]
     fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+        self.encode_none()
     }
 
     #[inline]
