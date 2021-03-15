@@ -9,6 +9,8 @@ use futures::stream::{Stream, StreamExt};
 
 use super::constants::*;
 
+mod stream;
+
 pub type ByteStream<'en> = Pin<Box<dyn Stream<Item = Result<Vec<u8>, Error>> + Send + Unpin + 'en>>;
 
 pub struct Error {
@@ -271,9 +273,9 @@ impl<'en> en::Encoder<'en> for Encoder {
         S: Stream<Item = Result<(K, V), Self::Error>> + Send + Unpin + 'en,
     >(
         self,
-        _map: S,
+        map: S,
     ) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+        Ok(Box::pin(stream::encode_map(map)))
     }
 
     #[inline]
@@ -287,9 +289,9 @@ impl<'en> en::Encoder<'en> for Encoder {
         S: Stream<Item = Result<T, Self::Error>> + Send + Unpin + 'en,
     >(
         self,
-        _seq: S,
+        seq: S,
     ) -> Result<Self::Ok, Self::Error> {
-        unimplemented!()
+        Ok(Box::pin(stream::encode_list(seq)))
     }
 
     #[inline]
