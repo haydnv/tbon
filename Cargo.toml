@@ -10,8 +10,8 @@ readme = "README.md"
 categories = ["asynchronous", "encoding", "parser-implementations", "parsing", "web-programming"]
 keywords = ["binary", "stream", "decode", "serialize", "deserialize"]
 
-
 [dependencies]
+bytes = "1.0"
 destream = "0.3"
 futures = "0.3"
 num-traits = "0.2"

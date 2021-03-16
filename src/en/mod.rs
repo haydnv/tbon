@@ -3,6 +3,7 @@ use std::fmt;
 use std::mem;
 use std::pin::Pin;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use destream::en;
 use futures::future;
 use futures::stream::{Stream, StreamExt};
@@ -12,7 +13,7 @@ use super::constants::*;
 
 mod stream;
 
-pub type ByteStream<'en> = Pin<Box<dyn Stream<Item = Result<Vec<u8>, Error>> + Send + Unpin + 'en>>;
+pub type ByteStream<'en> = Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en>>;
 
 pub struct Error {
     message: String,
@@ -102,11 +103,7 @@ impl<'en> en::EncodeMap<'en> for MapEncoder<'en> {
         let mut encoded = delimiter(MAP_BEGIN);
 
         while let Some((key, value)) = self.entries.pop_front() {
-            encoded = Box::pin(encoded.chain(key).chain(delimiter(COLON)).chain(value));
-
-            if !self.entries.is_empty() {
-                encoded = Box::pin(encoded.chain(delimiter(COMMA)));
-            }
+            encoded = Box::pin(encoded.chain(key).chain(value));
         }
 
         encoded = Box::pin(encoded.chain(delimiter(MAP_END)));
@@ -140,10 +137,6 @@ impl<'en> SequenceEncoder<'en> {
 
         while let Some(item) = self.items.pop_front() {
             encoded = Box::pin(encoded.chain(item));
-
-            if !self.items.is_empty() {
-                encoded = Box::pin(encoded.chain(delimiter(COMMA)));
-            }
         }
 
         encoded = Box::pin(encoded.chain(delimiter(LIST_END)));
@@ -193,10 +186,14 @@ pub struct Encoder;
 
 impl Encoder {
     #[inline]
-    fn encode_type<'en>(&self, dtype: &Type, value: Vec<u8>) -> Result<ByteStream<'en>, Error> {
-        Ok(Box::pin(
-            futures::stream::iter(vec![vec![dtype.to_u8().unwrap()], value]).map(Ok),
-        ))
+    fn encode_type<'en>(&self, dtype: &Type, value: &[u8]) -> Result<ByteStream<'en>, Error> {
+        let mut chunk = BytesMut::with_capacity(value.len() + 1);
+        chunk.put_u8(dtype.to_u8().unwrap());
+        chunk.extend_from_slice(value);
+
+        Ok(Box::pin(futures::stream::once(future::ready(Ok(
+            chunk.into()
+        )))))
     }
 
     #[inline]
@@ -204,13 +201,18 @@ impl Encoder {
         &self,
         dtype: &Type,
         start: u8,
-        value: Vec<u8>,
+        value: &[u8],
         end: u8,
     ) -> Result<ByteStream<'en>, Error> {
-        Ok(Box::pin(
-            futures::stream::iter(vec![vec![dtype.to_u8().unwrap(), start], value, vec![end]])
-                .map(Ok),
-        ))
+        let mut chunk = BytesMut::with_capacity(value.len() + 3);
+        chunk.put_u8(dtype.to_u8().unwrap());
+        chunk.put_u8(start);
+        chunk.extend_from_slice(value);
+        chunk.put_u8(end);
+
+        Ok(Box::pin(futures::stream::once(future::ready(Ok(
+            chunk.into()
+        )))))
     }
 }
 
@@ -224,78 +226,73 @@ impl<'en> en::Encoder<'en> for Encoder {
     #[inline]
     fn encode_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
         let value = if v { TRUE } else { FALSE };
-        self.encode_type(&Type::Bool, value.to_vec())
+        self.encode_type(&Type::Bool, value)
     }
 
     #[inline]
     fn encode_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::I8, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::I8, &v.to_be_bytes())
     }
 
     fn encode_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::I16, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::I16, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::I32, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::I32, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::I64, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::I64, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::U8, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::U8, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::U16, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::U16, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::U32, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::U32, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::U64, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::U64, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::F32, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::F32, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        self.encode_type(&Type::F64, v.to_be_bytes().to_vec())
+        self.encode_type(&Type::F64, &v.to_be_bytes())
     }
 
     #[inline]
     fn encode_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(
-            &Type::String,
-            STRING_BEGIN,
-            v.as_bytes().to_vec(),
-            STRING_END,
-        )
+        self.encode_string_type(&Type::String, STRING_BEGIN[0], v.as_bytes(), STRING_END[0])
     }
 
     #[inline]
     fn encode_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(&Type::String, BITSTRING_BEGIN, v.to_vec(), BITSTRING_END)
+        self.encode_string_type(&Type::String, BITSTRING_BEGIN[0], v, BITSTRING_END[0])
     }
 
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
-        Ok(Box::pin(futures::stream::once(future::ready(Ok(vec![
-            (&Type::None).to_u8().unwrap(),
-        ])))))
+        Ok(Box::pin(futures::stream::once(future::ready(Ok(
+            Bytes::from(vec![(&Type::None).to_u8().unwrap()]),
+        )))))
     }
 
     #[inline]
@@ -348,7 +345,8 @@ impl<'en> en::Encoder<'en> for Encoder {
 }
 
 #[inline]
-fn delimiter<'en>(byte: u8) -> ByteStream<'en> {
-    let encoded = futures::stream::once(future::ready(Ok(vec![byte])));
-    Box::pin(encoded)
+fn delimiter<'en>(delimiter: &'static [u8]) -> ByteStream<'en> {
+    Box::pin(futures::stream::once(future::ready(Ok(
+        Bytes::from_static(delimiter),
+    ))))
 }
