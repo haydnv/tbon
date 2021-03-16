@@ -10,10 +10,16 @@ readme = "README.md"
 categories = ["asynchronous", "encoding", "parser-implementations", "parsing", "web-programming"]
 keywords = ["binary", "stream", "decode", "serialize", "deserialize"]
 
+[features]
+default = []
+tokio = ["tokio-io/io-util"]
+
 [dependencies]
+async-trait = "0.1"
 bytes = "1.0"
 destream = "0.3"
 futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.3"
 pin-project = "1.0"
+tokio-io = { package = "tokio", version = "1.2", features = ["io-util"], optional = true }
