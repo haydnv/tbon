@@ -1,12 +1,22 @@
+use std::fmt;
+
 use num_derive::{FromPrimitive, ToPrimitive};
+
+pub const BITSTRING_BEGIN: &'static [u8; 1] = &[b'<'];
+pub const BITSTRING_END: &'static [u8; 1] = &[b'>'];
+pub const ESCAPE: &'static [u8; 1] = &[b'\\'];
+pub const LIST_BEGIN: &'static [u8; 1] = &[b'['];
+pub const LIST_END: &'static [u8; 1] = &[b'['];
+pub const MAP_BEGIN: &'static [u8; 1] = &[b'{'];
+pub const MAP_END: &'static [u8; 1] = &[b'{'];
+pub const STRING_BEGIN: &'static [u8; 1] = &[b'"'];
+pub const STRING_END: &'static [u8; 1] = &[b'"'];
+pub const TRUE: &'static [u8; 1] = &[1];
+pub const FALSE: &'static [u8; 1] = &[0];
 
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum Type {
-    Bytes = 1,
-    None,
-    Map,
-    Sequence,
-    String,
+    None = 1,
     Bool,
     F32,
     F64,
@@ -20,14 +30,21 @@ pub enum Type {
     U64,
 }
 
-pub const BITSTRING_BEGIN: &'static [u8; 1] = &[b'<'];
-pub const BITSTRING_END: &'static [u8; 1] = &[b'>'];
-pub const ESCAPE: &'static [u8; 1] = &[b'\\'];
-pub const LIST_BEGIN: &'static [u8; 1] = &[b'['];
-pub const LIST_END: &'static [u8; 1] = &[b'['];
-pub const MAP_BEGIN: &'static [u8; 1] = &[b'{'];
-pub const MAP_END: &'static [u8; 1] = &[b'{'];
-pub const STRING_BEGIN: &'static [u8; 1] = &[b'"'];
-pub const STRING_END: &'static [u8; 1] = &[b'"'];
-pub const TRUE: &'static [u8; 1] = &[1];
-pub const FALSE: &'static [u8; 1] = &[0];
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match self {
+            Self::None => "none",
+            Self::Bool => "boolean",
+            Self::F32 => "32-bit float",
+            Self::F64 => "64-bit float",
+            Self::I8 => "8-bit int",
+            Self::I16 => "16-bit int",
+            Self::I32 => "32-bit int",
+            Self::I64 => "64-bit int",
+            Self::U8 => "8-bit unsigned int",
+            Self::U16 => "16-bit unsigned int",
+            Self::U32 => "32-bit unsigned int",
+            Self::U64 => "64-bit unsigned int",
+        })
+    }
+}

@@ -4,12 +4,16 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use destream::{de, FromStream, Visitor};
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStreamExt};
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, ToPrimitive};
 
 #[cfg(tokio)]
 use tokio_io::io::{AsyncRead, AsyncReadExt, BufReader};
 
 use crate::constants::*;
+
+mod element;
+
+use element::Element;
 
 #[async_trait]
 pub trait Read: Send + Unpin {
@@ -309,6 +313,73 @@ impl<R: Read> Decoder<R> {
         }
     }
 
+    async fn ignore_value(&mut self) -> Result<(), Error> {
+        while self.buffer.is_empty() && !self.source.is_terminated() {
+            self.buffer().await?;
+        }
+
+        if self.buffer.is_empty() {
+            Ok(())
+        } else {
+            match &[self.buffer[0]] {
+                BITSTRING_BEGIN => {
+                    self.parse_bitstring().await?;
+                }
+                LIST_BEGIN => {
+                    self.buffer_string(LIST_BEGIN, LIST_END).await?;
+                }
+                MAP_BEGIN => {
+                    self.buffer_string(MAP_BEGIN, MAP_END).await?;
+                }
+                STRING_BEGIN => {
+                    self.parse_string().await?;
+                }
+                &[dtype] => match Type::from_u8(dtype)
+                    .ok_or_else(|| de::Error::invalid_type("unknown", "any supported type"))?
+                {
+                    Type::None => {
+                        self.parse_unit().await?;
+                    }
+                    Type::Bool => {
+                        self.parse_element::<bool>().await?;
+                    }
+                    Type::F32 => {
+                        self.parse_element::<f32>().await?;
+                    }
+                    Type::F64 => {
+                        self.parse_element::<f64>().await?;
+                    }
+                    Type::I8 => {
+                        self.parse_element::<i8>().await?;
+                    }
+                    Type::I16 => {
+                        self.parse_element::<i16>().await?;
+                    }
+                    Type::I32 => {
+                        self.parse_element::<i32>().await?;
+                    }
+                    Type::I64 => {
+                        self.parse_element::<i64>().await?;
+                    }
+                    Type::U8 => {
+                        self.parse_element::<u8>().await?;
+                    }
+                    Type::U16 => {
+                        self.parse_element::<u16>().await?;
+                    }
+                    Type::U32 => {
+                        self.parse_element::<u32>().await?;
+                    }
+                    Type::U64 => {
+                        self.parse_element::<u64>().await?;
+                    }
+                },
+            };
+
+            Ok(())
+        }
+    }
+
     async fn maybe_delimiter(&mut self, delimiter: &'static [u8]) -> Result<bool, Error> {
         while self.buffer.is_empty() && !self.source.is_terminated() {
             self.buffer().await?;
@@ -324,8 +395,20 @@ impl<R: Read> Decoder<R> {
         }
     }
 
-    async fn parse_element<N>(&mut self) -> Result<N, Error> {
-        unimplemented!()
+    async fn parse_element<N: Element>(&mut self) -> Result<N, Error> {
+        while self.buffer.len() < N::size() && !self.source.is_terminated() {
+            self.buffer().await?;
+        }
+
+        if self.buffer.len() < N::size() {
+            return Err(de::Error::invalid_length(
+                self.buffer.len(),
+                std::any::type_name::<N>(),
+            ));
+        }
+
+        let bytes: Vec<u8> = self.buffer.drain(0..N::size()).collect();
+        N::parse(&bytes)
     }
 
     async fn parse_bitstring(&mut self) -> Result<Bytes, Error> {
@@ -338,7 +421,21 @@ impl<R: Read> Decoder<R> {
     }
 
     async fn parse_unit(&mut self) -> Result<(), Error> {
-        unimplemented!()
+        while self.buffer.is_empty() && !self.source.is_terminated() {
+            self.buffer().await?;
+        }
+
+        if self.buffer.is_empty() {
+            return Err(Error::unexpected_end());
+        }
+
+        match self.buffer.remove(0) {
+            byte if Some(byte) == Type::None.to_u8() => Ok(()),
+            other => match Type::from_u8(other) {
+                Some(dtype) => Err(de::Error::invalid_type(dtype, Type::None)),
+                None => Err(de::Error::invalid_type("(unknown)", Type::None)),
+            },
+        }
     }
 }
 
@@ -362,8 +459,20 @@ impl<R: Read> de::Decoder for Decoder<R> {
             STRING_BEGIN => self.decode_string(visitor).await,
             [dtype] => {
                 match Type::from_u8(*dtype).ok_or_else(|| de::Error::custom("unknown type"))? {
-                    _ => unimplemented!(),
+                    Type::None => self.decode_unit(visitor),
+                    Type::Bool => self.decode_bool(visitor),
+                    Type::F32 => self.decode_f32(visitor),
+                    Type::F64 => self.decode_f64(visitor),
+                    Type::I8 => self.decode_i8(visitor),
+                    Type::I16 => self.decode_i16(visitor),
+                    Type::I32 => self.decode_i32(visitor),
+                    Type::I64 => self.decode_i64(visitor),
+                    Type::U8 => self.decode_u8(visitor),
+                    Type::U16 => self.decode_u16(visitor),
+                    Type::U32 => self.decode_u32(visitor),
+                    Type::U64 => self.decode_u64(visitor),
                 }
+                .await
             }
         }
     }
@@ -433,8 +542,20 @@ impl<R: Read> de::Decoder for Decoder<R> {
         visitor.visit_byte_buf(buf.to_vec())
     }
 
-    async fn decode_option<V: Visitor>(&mut self, _visitor: V) -> Result<V::Value, Self::Error> {
-        unimplemented!()
+    async fn decode_option<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        while self.buffer.is_empty() && !self.source.is_terminated() {
+            self.buffer().await?;
+        }
+
+        if self.buffer.is_empty() {
+            return Err(Error::unexpected_end());
+        }
+
+        if Some(self.buffer[0]) == Type::None.to_u8() {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self).await
+        }
     }
 
     async fn decode_seq<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
@@ -466,9 +587,10 @@ impl<R: Read> de::Decoder for Decoder<R> {
 
     async fn decode_ignored_any<V: Visitor>(
         &mut self,
-        _visitor: V,
+        visitor: V,
     ) -> Result<V::Value, Self::Error> {
-        unimplemented!()
+        self.ignore_value().await?;
+        visitor.visit_unit()
     }
 }
 

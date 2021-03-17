@@ -199,13 +199,11 @@ impl Encoder {
     #[inline]
     fn encode_string_type<'en>(
         &self,
-        dtype: &Type,
         start: u8,
         value: &[u8],
         end: u8,
     ) -> Result<ByteStream<'en>, Error> {
-        let mut chunk = BytesMut::with_capacity(value.len() + 3);
-        chunk.put_u8(dtype.to_u8().unwrap());
+        let mut chunk = BytesMut::with_capacity(value.len() + 2);
         chunk.put_u8(start);
         chunk.extend_from_slice(value);
         chunk.put_u8(end);
@@ -280,12 +278,12 @@ impl<'en> en::Encoder<'en> for Encoder {
 
     #[inline]
     fn encode_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(&Type::String, STRING_BEGIN[0], v.as_bytes(), STRING_END[0])
+        self.encode_string_type(STRING_BEGIN[0], v.as_bytes(), STRING_END[0])
     }
 
     #[inline]
     fn encode_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(&Type::String, BITSTRING_BEGIN[0], v, BITSTRING_END[0])
+        self.encode_string_type(BITSTRING_BEGIN[0], v, BITSTRING_END[0])
     }
 
     #[inline]
