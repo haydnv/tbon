@@ -300,6 +300,7 @@ impl<R: Read> Decoder<R> {
                 }
 
                 s.put_u8(byte);
+                escape = false;
             } else if as_slice == ESCAPE {
                 escape = true;
             } else {
