@@ -6,6 +6,7 @@ edition = "2018"
 description = "Tinychain Binary Object Notation is a compact and versatile stream-friendly binary serialization format"
 repository = "http://github.com/haydnv/tbon"
 readme = "README.md"
+license = "Apache-2.0"
 
 categories = ["asynchronous", "encoding", "parser-implementations", "parsing", "web-programming"]
 keywords = ["binary", "stream", "decode", "serialize", "deserialize"]
@@ -13,6 +14,7 @@ keywords = ["binary", "stream", "decode", "serialize", "deserialize"]
 [features]
 default = []
 tokio-io = ["tokio/io-util"]
+all = ["tokio-io"]
 
 [dependencies]
 async-trait = "0.1"

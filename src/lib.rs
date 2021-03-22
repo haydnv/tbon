@@ -1,3 +1,24 @@
+//! Library for decoding and encoding JSON streams.
+//!
+//! Example:
+//! ```
+//! # use bytes::Bytes;
+//! # use futures::executor::block_on;
+//! let expected = ("one".to_string(), 2.0, vec![3, 4], Bytes::from(vec![5u8]));
+//! let stream = tbon::en::encode(&expected).unwrap();
+//! let actual = block_on(tbon::de::try_decode((), stream)).unwrap();
+//! assert_eq!(expected, actual);
+//! ```
+//!
+//! *Important note*: TBON adds one byte to primitive values to record the value's type. In cases
+//! where TBON must encode a large number of values of the same type, such as an n-dimensional array
+//! of numbers, this adds 12-50% overhead to the size of the encoded data. However, encoding a
+//! `Bytes` struct has a negligible overhead of only two bytes, regardless of the data size.
+//!
+//! To efficiently transport an n-dimensional array, it is recommended to use compression
+//! (e.g. gzip) and/or implement [`destream::FromStream`] and [`destream::ToStream`] using `Bytes`.
+//!
+
 mod constants;
 
 pub mod de;
@@ -7,13 +28,15 @@ pub mod en;
 mod tests {
     use std::collections::HashMap;
     use std::fmt;
+    use std::iter::FromIterator;
 
     use bytes::Bytes;
     use destream::{FromStream, IntoStream};
 
     use rand::Rng;
 
-    use super::*;
+    use super::de::*;
+    use super::en::*;
 
     async fn run_test<
         'en,
@@ -21,8 +44,8 @@ mod tests {
     >(
         value: T,
     ) {
-        let encoded = en::encode(value.clone()).unwrap();
-        let decoded: T = de::try_decode((), encoded).await.unwrap();
+        let encoded = encode(value.clone()).unwrap();
+        let decoded: T = try_decode((), encoded).await.unwrap();
         assert_eq!(decoded, value);
     }
 
@@ -72,6 +95,17 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(-1i32, String::from("I'm a teapot"));
         map.insert(-1i32, String::from("\' \"\"     "));
+        run_test(map).await;
+
+        let tuple: (Vec<f32>, Vec<i32>) = (vec![], vec![1]);
+        run_test(tuple).await;
+
+        let mut map = HashMap::new();
+        map.insert("one".to_string(), HashMap::new());
+        map.insert(
+            "two".to_string(),
+            HashMap::from_iter(vec![("three".to_string(), 4f32)]),
+        );
         run_test(map).await;
     }
 }

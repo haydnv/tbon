@@ -1,3 +1,5 @@
+//! Encode a Rust data structure into a TBON stream.
+
 use std::collections::VecDeque;
 use std::fmt;
 use std::mem;
@@ -6,7 +8,7 @@ use std::pin::Pin;
 use bytes::{BufMut, Bytes, BytesMut};
 use destream::{en, IntoStream};
 use futures::future;
-use futures::stream::{Stream, StreamExt};
+use futures::stream::{Stream, StreamExt, TryStreamExt};
 use num_traits::ToPrimitive;
 
 use super::constants::*;
@@ -362,8 +364,53 @@ fn delimiter<'en>(delimiter: &'static [u8]) -> ByteStream<'en> {
     ))))
 }
 
+/// Given an encodable value, return an encoded stream.
 pub fn encode<'en, T: IntoStream<'en> + 'en>(
     value: T,
 ) -> Result<impl Stream<Item = Result<Bytes, Error>> + 'en, Error> {
     value.into_stream(Encoder)
+}
+
+/// Given a stream of encodable key-value pairs, return an encoded map stream.
+pub fn encode_map<
+    'en,
+    K: IntoStream<'en> + 'en,
+    V: IntoStream<'en> + 'en,
+    S: Stream<Item = (K, V)> + Send + Unpin + 'en,
+>(
+    seq: S,
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+    stream::encode_map(seq.map(Result::<(K, V), Error>::Ok))
+}
+
+/// Given a stream of encodable key-value pairs, return an encoded map stream.
+pub fn try_encode_map<
+    'en,
+    E: fmt::Display + 'en,
+    K: IntoStream<'en> + 'en,
+    V: IntoStream<'en> + 'en,
+    S: Stream<Item = Result<(K, V), E>> + Send + Unpin + 'en,
+>(
+    seq: S,
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+    Box::pin(stream::encode_map(seq.map_err(en::Error::custom)))
+}
+
+/// Given a stream of encodable elements, return an encoded sequence stream.
+pub fn encode_seq<'en, T: IntoStream<'en> + 'en, S: Stream<Item = T> + Send + Unpin + 'en>(
+    seq: S,
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+    stream::encode_list(seq.map(Result::<T, Error>::Ok))
+}
+
+/// Given a stream of encodable elements, return an encoded sequence stream.
+pub fn try_encode_seq<
+    'en,
+    E: fmt::Display + 'en,
+    T: IntoStream<'en> + 'en,
+    S: Stream<Item = Result<T, E>> + Send + Unpin + 'en,
+>(
+    seq: S,
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+    stream::encode_list(seq.map_err(en::Error::custom))
 }
