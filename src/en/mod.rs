@@ -4,7 +4,7 @@ use std::mem;
 use std::pin::Pin;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use destream::en;
+use destream::{en, IntoStream};
 use futures::future;
 use futures::stream::{Stream, StreamExt};
 use num_traits::ToPrimitive;
@@ -360,4 +360,10 @@ fn delimiter<'en>(delimiter: &'static [u8]) -> ByteStream<'en> {
     Box::pin(futures::stream::once(future::ready(Ok(
         Bytes::from_static(delimiter),
     ))))
+}
+
+pub fn encode<'en, T: IntoStream<'en> + 'en>(
+    value: T,
+) -> Result<impl Stream<Item = Result<Bytes, Error>> + 'en, Error> {
+    value.into_stream(Encoder)
 }

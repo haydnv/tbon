@@ -12,7 +12,7 @@ keywords = ["binary", "stream", "decode", "serialize", "deserialize"]
 
 [features]
 default = []
-tokio = ["tokio-io/io-util"]
+tokio-io = ["tokio/io-util"]
 
 [dependencies]
 async-trait = "0.1"
@@ -22,4 +22,9 @@ futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.3"
 pin-project = "1.0"
-tokio-io = { package = "tokio", version = "1.2", features = ["io-util"], optional = true }
+tokio = { version = "1.2", features = ["io-util"], optional = true }
+
+[dev-dependencies]
+rand = "0.8"
+tokio = { version = "1.2", features = ["macros"] }
+tokio-test = "0.4"

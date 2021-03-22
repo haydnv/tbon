@@ -416,15 +416,24 @@ impl<R: Read> Decoder<R> {
     }
 
     async fn parse_element<N: Element>(&mut self) -> Result<N, Error> {
-        while self.buffer.len() < N::size() && !self.source.is_terminated() {
+        while self.buffer.len() <= N::size() && !self.source.is_terminated() {
             self.buffer().await?;
         }
 
-        if self.buffer.len() < N::size() {
+        if self.buffer.len() <= N::size() {
             return Err(de::Error::invalid_length(
                 self.buffer.len(),
                 std::any::type_name::<N>(),
             ));
+        }
+
+        let dtype = self.buffer.remove(0);
+        if Some(dtype) == N::dtype().to_u8() {
+            // no-op
+        } else if let Some(dtype) = Type::from_u8(dtype) {
+            return Err(de::Error::invalid_type(dtype, N::dtype()));
+        } else {
+            return Err(de::Error::invalid_value(dtype, "a TBON type bit"));
         }
 
         let bytes: Vec<u8> = self.buffer.drain(0..N::size()).collect();
