@@ -1,7 +1,7 @@
 use std::fmt;
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use destream::{de, FromStream, Visitor};
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStreamExt};
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -287,10 +287,29 @@ impl<R: Read> Decoder<R> {
             }
         }
 
-        let s = self.buffer.drain(0..i).collect();
+        let mut escape = false;
+        let mut s = BytesMut::with_capacity(i);
+        for byte in self.buffer.drain(0..i) {
+            let as_slice = std::slice::from_ref(&byte);
+
+            if escape {
+                if as_slice == begin || as_slice == end {
+                    // no-op
+                } else {
+                    s.extend(ESCAPE);
+                }
+
+                s.put_u8(byte);
+            } else if as_slice == ESCAPE {
+                escape = true;
+            } else {
+                s.put_u8(byte);
+            }
+        }
+
         self.buffer.remove(0); // process the end delimiter
         self.buffer.shrink_to_fit();
-        Ok(s)
+        Ok(s.into())
     }
 
     async fn expect_delimiter(&mut self, delimiter: &'static [u8]) -> Result<(), Error> {

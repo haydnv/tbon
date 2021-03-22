@@ -205,12 +205,25 @@ impl Encoder {
     ) -> Result<ByteStream<'en>, Error> {
         let mut chunk = BytesMut::with_capacity(value.len() + 2);
         chunk.put_u8(start);
-        chunk.extend_from_slice(value);
+        chunk.extend(self.escape(value, &[start, end]));
         chunk.put_u8(end);
 
         Ok(Box::pin(futures::stream::once(future::ready(Ok(
             chunk.into()
         )))))
+    }
+
+    fn escape(&self, value: &[u8], control: &[u8]) -> Vec<u8> {
+        let mut escaped = Vec::with_capacity(value.len() * 2);
+        for char in value {
+            if control.contains(char) {
+                escaped.push(ESCAPE[0])
+            }
+
+            escaped.push(*char);
+        }
+
+        escaped
     }
 }
 
