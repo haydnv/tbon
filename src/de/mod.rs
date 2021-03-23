@@ -8,7 +8,7 @@ use destream::{de, FromStream, Visitor};
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStreamExt};
 use num_traits::{FromPrimitive, ToPrimitive};
 
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 
 use crate::constants::*;
@@ -47,14 +47,14 @@ impl<S: Stream> From<S> for SourceStream<S> {
     }
 }
 
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 pub struct SourceReader<R: AsyncRead> {
     reader: BufReader<R>,
     terminated: bool,
 }
 
 #[async_trait]
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 impl<R: AsyncRead + Send + Unpin> Read for SourceReader<R> {
     async fn next(&mut self) -> Option<Result<Bytes, Error>> {
         let mut chunk = Vec::new();
@@ -76,7 +76,7 @@ impl<R: AsyncRead + Send + Unpin> Read for SourceReader<R> {
     }
 }
 
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 impl<R: AsyncRead> From<R> for SourceReader<R> {
     fn from(reader: R) -> Self {
         Self {
@@ -230,7 +230,7 @@ pub struct Decoder<R> {
     buffer: Vec<u8>,
 }
 
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 impl<A: AsyncRead> Decoder<A>
 where
     SourceReader<A>: Read,
@@ -646,7 +646,7 @@ pub async fn try_decode<
 }
 
 /// Decode the given JSON-encoded stream of bytes into an instance of `T` using the given context.
-#[cfg(tokio_io)]
+#[cfg(feature = "tokio-io")]
 pub async fn read_from<R: AsyncReadExt + Send + Unpin, T: FromStream>(
     context: T::Context,
     source: R,
