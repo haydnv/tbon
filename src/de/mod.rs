@@ -272,21 +272,25 @@ impl<R: Read> Decoder<R> {
         self.expect_delimiter(begin).await?;
 
         let mut i = 0;
+        let mut escaped = false;
         loop {
             while i >= self.buffer.len() && !self.source.is_terminated() {
                 self.buffer().await?;
             }
 
-            if i < self.buffer.len()
-                && &self.buffer[i..i + 1] == end
-                && (i == 0 || &self.buffer[i - 1..i] != ESCAPE)
-            {
+            if i < self.buffer.len() && &self.buffer[i..i + 1] == end && !escaped {
                 break;
             } else if self.source.is_terminated() {
                 return Err(Error::unexpected_end());
-            } else {
-                i += 1;
             }
+
+            if escaped {
+                escaped = false;
+            } else if self.buffer[i] == ESCAPE[0] {
+                escaped = true;
+            }
+
+            i += 1;
         }
 
         let mut escape = false;
@@ -295,12 +299,6 @@ impl<R: Read> Decoder<R> {
             let as_slice = std::slice::from_ref(&byte);
 
             if escape {
-                if as_slice == begin || as_slice == end {
-                    // no-op
-                } else {
-                    s.extend(ESCAPE);
-                }
-
                 s.put_u8(byte);
                 escape = false;
             } else if as_slice == ESCAPE {

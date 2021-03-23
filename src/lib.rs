@@ -73,6 +73,7 @@ mod tests {
         run_test(String::from("hello world")).await;
         run_test(String::from("Привет, мир")).await;
         run_test(String::from("this is a \"string\" within a \\ string")).await;
+        run_test(String::from("this \"string\" is \\\terminated by a \\")).await;
 
         let bitstring = Bytes::from((0..255u8).collect::<Vec<u8>>());
         run_test(bitstring).await;

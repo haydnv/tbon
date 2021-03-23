@@ -218,7 +218,7 @@ impl Encoder {
     fn escape(&self, value: &[u8], control: &[u8]) -> Vec<u8> {
         let mut escaped = Vec::with_capacity(value.len() * 2);
         for char in value {
-            if control.contains(char) {
+            if control.contains(char) || char == &ESCAPE[0] {
                 escaped.push(ESCAPE[0])
             }
 
