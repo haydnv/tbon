@@ -86,7 +86,7 @@ impl<R: AsyncRead> From<R> for SourceReader<R> {
     }
 }
 
-/// An error encountered while decoding a JSON stream.
+/// An error encountered while decoding a TBON stream.
 pub struct Error {
     message: String,
 }
@@ -224,7 +224,7 @@ impl<'a, S: Read + 'a> de::SeqAccess for SeqAccess<'a, S> {
     }
 }
 
-/// A structure that decodes Rust values from a JSON stream.
+/// A structure that decodes Rust values from a TBON stream.
 pub struct Decoder<R> {
     source: R,
     buffer: Vec<u8>,
@@ -623,7 +623,7 @@ impl<R: Read> de::Decoder for Decoder<R> {
     }
 }
 
-/// Decode the given JSON-encoded stream of bytes into an instance of `T` using the given context.
+/// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
 pub async fn decode<S: Stream<Item = Bytes> + Send + Unpin, T: FromStream>(
     context: T::Context,
     source: S,
@@ -632,7 +632,7 @@ pub async fn decode<S: Stream<Item = Bytes> + Send + Unpin, T: FromStream>(
     T::from_stream(context, &mut decoder).await
 }
 
-/// Decode the given JSON-encoded stream of bytes into an instance of `T` using the given context.
+/// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
 pub async fn try_decode<
     E: fmt::Display,
     S: Stream<Item = Result<Bytes, E>> + Send + Unpin,
@@ -645,7 +645,7 @@ pub async fn try_decode<
     T::from_stream(context, &mut decoder).await
 }
 
-/// Decode the given JSON-encoded stream of bytes into an instance of `T` using the given context.
+/// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
 #[cfg(feature = "tokio-io")]
 pub async fn read_from<R: AsyncReadExt + Send + Unpin, T: FromStream>(
     context: T::Context,

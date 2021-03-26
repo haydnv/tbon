@@ -1,4 +1,4 @@
-//! Library for decoding and encoding JSON streams.
+//! Library for encoding Rust program data into a binary stream, and decoding that stream.
 //!
 //! Example:
 //! ```
@@ -15,7 +15,7 @@
 //! of numbers, this adds 12-50% overhead to the size of the encoded data. However, encoding a
 //! `Bytes` struct has a negligible overhead of only two bytes, regardless of the data size.
 //!
-//! To efficiently transport an n-dimensional array, it is recommended to use compression
+//! To efficiently encode an n-dimensional array, it is recommended to use compression
 //! (e.g. gzip) and/or implement [`destream::FromStream`] and [`destream::ToStream`] using `Bytes`.
 //!
 
