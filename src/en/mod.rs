@@ -29,6 +29,8 @@ impl en::Error for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)

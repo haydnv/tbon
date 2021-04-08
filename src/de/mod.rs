@@ -487,7 +487,9 @@ impl<R: Read> de::Decoder for Decoder<R> {
             MAP_BEGIN => self.decode_map(visitor).await,
             STRING_BEGIN => self.decode_string(visitor).await,
             [dtype] => {
-                match Type::from_u8(*dtype).ok_or_else(|| de::Error::custom("unknown type"))? {
+                match Type::from_u8(*dtype)
+                    .ok_or_else(|| de::Error::custom(format!("invalid type bit: {}", dtype)))?
+                {
                     Type::None => self.decode_unit(visitor),
                     Type::Bool => self.decode_bool(visitor),
                     Type::F32 => self.decode_f32(visitor),
