@@ -17,6 +17,8 @@ mod element;
 
 use element::Element;
 
+const CHUNK_SIZE: usize = 4096;
+
 #[async_trait]
 pub trait Read: Send + Unpin {
     async fn next(&mut self) -> Option<Result<Bytes, Error>>;
@@ -313,6 +315,46 @@ impl<R: Read> Decoder<R> {
         Ok(s.into())
     }
 
+    async fn ignore_string(
+        &mut self,
+        begin: &'static [u8],
+        end: &'static [u8],
+    ) -> Result<(), Error> {
+        self.expect_delimiter(begin).await?;
+
+        let mut i = 0;
+        let mut escaped = false;
+        loop {
+            while i >= self.buffer.len() && !self.source.is_terminated() {
+                self.buffer().await?;
+            }
+
+            if i < self.buffer.len() && &self.buffer[i..i + 1] == end && !escaped {
+                self.buffer.drain(..i);
+                break;
+            } else if self.source.is_terminated() {
+                return Err(Error::unexpected_end());
+            }
+
+            if escaped {
+                escaped = false;
+            } else if self.buffer[i] == ESCAPE[0] {
+                escaped = true;
+            }
+
+            if i > CHUNK_SIZE {
+                self.buffer.drain(..i);
+                i = 0;
+            } else {
+                i += 1;
+            }
+        }
+
+        self.buffer.remove(0); // process the end delimiter
+        self.buffer.shrink_to_fit();
+        Ok(())
+    }
+
     async fn expect_delimiter(&mut self, delimiter: &'static [u8]) -> Result<(), Error> {
         while self.buffer.is_empty() && !self.source.is_terminated() {
             self.buffer().await?;
@@ -343,16 +385,16 @@ impl<R: Read> Decoder<R> {
         } else {
             match &[self.buffer[0]] {
                 BITSTRING_BEGIN => {
-                    self.parse_bitstring().await?;
+                    self.ignore_string(BITSTRING_BEGIN, BITSTRING_END).await?;
                 }
                 LIST_BEGIN => {
-                    self.buffer_string(LIST_BEGIN, LIST_END).await?;
+                    self.ignore_string(LIST_BEGIN, LIST_END).await?;
                 }
                 MAP_BEGIN => {
-                    self.buffer_string(MAP_BEGIN, MAP_END).await?;
+                    self.ignore_string(MAP_BEGIN, MAP_END).await?;
                 }
                 STRING_BEGIN => {
-                    self.parse_string().await?;
+                    self.ignore_string(STRING_BEGIN, STRING_END).await?;
                 }
                 &[dtype] => match Type::from_u8(dtype)
                     .ok_or_else(|| de::Error::invalid_type("unknown", "any supported type"))?
