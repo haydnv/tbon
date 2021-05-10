@@ -79,6 +79,12 @@ impl Element for u8 {
     }
 }
 
+impl IntoBytes<1> for u8 {
+    fn into_bytes(self) -> [u8; 1] {
+        [self]
+    }
+}
+
 impl Element for u16 {
     const SIZE: usize = 2;
 
@@ -88,6 +94,12 @@ impl Element for u16 {
 
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl IntoBytes<2> for u16 {
+    fn into_bytes(self) -> [u8; 2] {
+        self.to_be_bytes()
     }
 }
 
@@ -103,6 +115,12 @@ impl Element for u32 {
     }
 }
 
+impl IntoBytes<4> for u32 {
+    fn into_bytes(self) -> [u8; 4] {
+        self.to_be_bytes()
+    }
+}
+
 impl Element for u64 {
     const SIZE: usize = 8;
 
@@ -112,6 +130,12 @@ impl Element for u64 {
 
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl IntoBytes<8> for u64 {
+    fn into_bytes(self) -> [u8; 8] {
+        self.to_be_bytes()
     }
 }
 
@@ -145,6 +169,12 @@ impl Element for i16 {
     }
 }
 
+impl IntoBytes<2> for i16 {
+    fn into_bytes(self) -> [u8; 2] {
+        self.to_be_bytes()
+    }
+}
+
 impl Element for i32 {
     const SIZE: usize = 4;
 
@@ -154,6 +184,12 @@ impl Element for i32 {
 
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl IntoBytes<4> for i32 {
+    fn into_bytes(self) -> [u8; 4] {
+        self.to_be_bytes()
     }
 }
 
@@ -169,6 +205,12 @@ impl Element for i64 {
     }
 }
 
+impl IntoBytes<8> for i64 {
+    fn into_bytes(self) -> [u8; 8] {
+        self.to_be_bytes()
+    }
+}
+
 impl Element for f32 {
     const SIZE: usize = 4;
 
@@ -181,6 +223,12 @@ impl Element for f32 {
     }
 }
 
+impl IntoBytes<4> for f32 {
+    fn into_bytes(self) -> [u8; 4] {
+        self.to_be_bytes()
+    }
+}
+
 impl Element for f64 {
     const SIZE: usize = 8;
 
@@ -190,5 +238,11 @@ impl Element for f64 {
 
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl IntoBytes<8> for f64 {
+    fn into_bytes(self) -> [u8; 8] {
+        self.to_be_bytes()
     }
 }
