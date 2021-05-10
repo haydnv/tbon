@@ -304,29 +304,20 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        let mut start = BytesMut::with_capacity(2);
-        start.extend_from_slice(ARRAY_DELIMIT);
-        start.put_u8(Type::Bool.to_u8().unwrap());
+        Ok(encode_array(chunks))
+    }
 
-        let start = futures::stream::once(future::ready(Ok(Bytes::from(start))));
-        let end = delimiter(ARRAY_DELIMIT);
-
-        let contents = chunks.map_ok(|chunk| {
-            let mut encoded = BytesMut::new();
-            for b in chunk.into_iter() {
-                let as_bytes = b.into_bytes();
-                if &as_bytes[..] == ARRAY_DELIMIT || &as_bytes[..] == ESCAPE {
-                    encoded.extend_from_slice(ESCAPE);
-                }
-
-                encoded.put_slice(&as_bytes);
-            }
-            encoded.into()
-        });
-
-        let encoded: ByteStream = Box::pin(start.chain(contents).chain(end));
-
-        Ok(encoded)
+    fn encode_array_i8<
+        T: IntoIterator<Item = i8> + Send + Unpin + 'en,
+        S: Stream<Item = Result<T, Self::Error>> + Send + Unpin + 'en,
+    >(
+        self,
+        chunks: S,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
+    {
+        Ok(encode_array(chunks))
     }
 
     #[inline]
@@ -451,4 +442,38 @@ pub fn try_encode_seq<
     seq: S,
 ) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
     stream::encode_list(seq.map_err(en::Error::custom))
+}
+
+fn encode_array<
+    'en,
+    E: IntoBytes<SIZE>,
+    T: IntoIterator<Item = E>,
+    S: Stream<Item = Result<T, Error>> + Send + Unpin + 'en,
+    const SIZE: usize,
+>(
+    chunks: S,
+) -> ByteStream<'en> {
+    let mut start = BytesMut::with_capacity(2);
+    start.extend_from_slice(ARRAY_DELIMIT);
+    start.put_u8(Type::Bool.to_u8().unwrap());
+
+    let start = futures::stream::once(future::ready(Ok(Bytes::from(start))));
+    let end = delimiter(ARRAY_DELIMIT);
+
+    let contents = chunks.map_ok(|chunk| {
+        let mut encoded = BytesMut::new();
+        for b in chunk.into_iter() {
+            let as_bytes = b.into_bytes();
+            if &as_bytes[..] == ARRAY_DELIMIT || &as_bytes[..] == ESCAPE {
+                encoded.extend_from_slice(ESCAPE);
+            }
+
+            encoded.put_slice(&as_bytes);
+        }
+        encoded.into()
+    });
+
+    let encoded: ByteStream = Box::pin(start.chain(contents).chain(end));
+
+    encoded
 }

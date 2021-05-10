@@ -717,6 +717,11 @@ impl<R: Read> de::Decoder for Decoder<R> {
         visitor.visit_array_bool(access).await
     }
 
+    async fn decode_array_i8<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        let access = ArrayAccess::new(self).await?;
+        visitor.visit_array_i8(access).await
+    }
+
     async fn decode_string<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let s = self.parse_string().await?;
         visitor.visit_string(s)

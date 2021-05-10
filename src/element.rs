@@ -127,6 +127,12 @@ impl Element for i8 {
     }
 }
 
+impl IntoBytes<1> for i8 {
+    fn into_bytes(self) -> [u8; 1] {
+        self.to_be_bytes()
+    }
+}
+
 impl Element for i16 {
     const SIZE: usize = 2;
 
