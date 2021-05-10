@@ -1,6 +1,7 @@
 //! Decode a Rust data structure from a TBON-encoded stream.
 
 use std::fmt;
+use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
@@ -11,11 +12,8 @@ use num_traits::{FromPrimitive, ToPrimitive};
 #[cfg(feature = "tokio-io")]
 use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 
-use crate::constants::*;
-
-mod element;
-
-use element::Element;
+use super::constants::*;
+use super::Element;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -122,6 +120,99 @@ impl fmt::Debug for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.message, f)
+    }
+}
+
+struct ArrayAccess<'a, S, T> {
+    decoder: &'a mut Decoder<S>,
+    dtype: PhantomData<T>,
+    done: bool,
+}
+
+impl<'a, S: Read + 'a, T: Element> ArrayAccess<'a, S, T> {
+    async fn new(decoder: &'a mut Decoder<S>) -> Result<ArrayAccess<'a, S, T>, Error> {
+        let dtype = &[T::dtype().to_u8().unwrap()];
+
+        decoder.expect_delimiter(ARRAY_DELIMIT).await?;
+        decoder.expect_delimiter(dtype).await?;
+
+        let done = decoder.maybe_delimiter(MAP_END).await?;
+
+        Ok(ArrayAccess {
+            decoder,
+            dtype: PhantomData,
+            done,
+        })
+    }
+}
+
+#[async_trait]
+impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a, S, T> {
+    type Error = Error;
+
+    async fn buffer(&mut self, buffer: &mut [T]) -> Result<usize, Self::Error> {
+        if self.done {
+            return Ok(0);
+        }
+
+        let size = T::SIZE;
+        let mut limit = buffer.len() * size;
+
+        let mut i = 0;
+        let mut escaped = false;
+
+        while i < limit {
+            while i >= self.decoder.buffer.len() && !self.decoder.source.is_terminated() {
+                self.decoder.buffer().await?;
+            }
+
+            if i < self.decoder.buffer.len()
+                && &self.decoder.buffer[i..i + 1] == ARRAY_DELIMIT
+                && !escaped
+            {
+                self.done = true;
+                break;
+            }
+
+            if escaped {
+                escaped = false;
+            } else if self.decoder.buffer[i] == ESCAPE[0] {
+                escaped = true;
+                limit += 1;
+            }
+
+            i += 1;
+        }
+
+        let mut escape = false;
+        let mut escaped = BytesMut::with_capacity(i);
+        for byte in self.decoder.buffer.drain(0..i) {
+            let as_slice = std::slice::from_ref(&byte);
+
+            if escape {
+                escaped.put_u8(byte);
+                escape = false;
+            } else if as_slice == ESCAPE {
+                escape = true;
+            } else {
+                escaped.put_u8(byte);
+            }
+        }
+
+        let mut i = 0;
+        let mut elements = 0;
+        while i < escaped.len() {
+            buffer[elements] = T::from_bytes(&escaped[i..i + size]);
+            elements += 1;
+            i += size;
+        }
+
+        if self.done {
+            self.decoder.buffer.remove(0); // process the end delimiter
+        }
+
+        self.decoder.buffer.shrink_to_fit();
+        Ok(elements)
     }
 }
 
@@ -355,7 +446,7 @@ impl<R: Read> Decoder<R> {
         Ok(())
     }
 
-    async fn expect_delimiter(&mut self, delimiter: &'static [u8]) -> Result<(), Error> {
+    async fn expect_delimiter(&mut self, delimiter: &[u8]) -> Result<(), Error> {
         while self.buffer.is_empty() && !self.source.is_terminated() {
             self.buffer().await?;
         }
@@ -393,8 +484,8 @@ impl<R: Read> Decoder<R> {
                 MAP_BEGIN => {
                     self.ignore_string(MAP_BEGIN, MAP_END).await?;
                 }
-                STRING_BEGIN => {
-                    self.ignore_string(STRING_BEGIN, STRING_END).await?;
+                STRING_DELIMIT => {
+                    self.ignore_string(STRING_DELIMIT, STRING_DELIMIT).await?;
                 }
                 &[dtype] => match Type::from_u8(dtype)
                     .ok_or_else(|| de::Error::invalid_type("unknown", "any supported type"))?
@@ -458,11 +549,11 @@ impl<R: Read> Decoder<R> {
     }
 
     async fn parse_element<N: Element>(&mut self) -> Result<N, Error> {
-        while self.buffer.len() <= N::size() && !self.source.is_terminated() {
+        while self.buffer.len() <= N::SIZE && !self.source.is_terminated() {
             self.buffer().await?;
         }
 
-        if self.buffer.len() <= N::size() {
+        if self.buffer.len() <= N::SIZE {
             return Err(de::Error::invalid_length(
                 self.buffer.len(),
                 std::any::type_name::<N>(),
@@ -478,7 +569,7 @@ impl<R: Read> Decoder<R> {
             return Err(de::Error::invalid_value(dtype, "a TBON type bit"));
         }
 
-        let bytes: Vec<u8> = self.buffer.drain(0..N::size()).collect();
+        let bytes: Vec<u8> = self.buffer.drain(0..N::SIZE).collect();
         N::parse(&bytes)
     }
 
@@ -487,7 +578,7 @@ impl<R: Read> Decoder<R> {
     }
 
     async fn parse_string(&mut self) -> Result<String, Error> {
-        let s = self.buffer_string(STRING_BEGIN, STRING_END).await?;
+        let s = self.buffer_string(STRING_DELIMIT, STRING_DELIMIT).await?;
         String::from_utf8(s.to_vec()).map_err(Error::invalid_utf8)
     }
 
@@ -523,15 +614,28 @@ impl<R: Read> de::Decoder for Decoder<R> {
             return Err(Error::unexpected_end());
         }
 
+        fn type_from(bit: u8) -> Result<Type, Error> {
+            Type::from_u8(bit)
+                .ok_or_else(|| de::Error::custom(format!("invalid type bit: {}", bit)))
+        }
+
         match &[self.buffer[0]] {
+            ARRAY_DELIMIT => {
+                while self.buffer.len() < 2 && !self.source.is_terminated() {
+                    self.buffer().await?;
+                }
+
+                match type_from(self.buffer[1])? {
+                    Type::Bool => self.decode_array_bool(visitor).await,
+                    dtype => return Err(de::Error::invalid_type(dtype, "a supported array type")),
+                }
+            }
             BITSTRING_BEGIN => self.decode_byte_buf(visitor).await,
             LIST_BEGIN => self.decode_seq(visitor).await,
             MAP_BEGIN => self.decode_map(visitor).await,
-            STRING_BEGIN => self.decode_string(visitor).await,
+            STRING_DELIMIT => self.decode_string(visitor).await,
             [dtype] => {
-                match Type::from_u8(*dtype)
-                    .ok_or_else(|| de::Error::custom(format!("invalid type bit: {}", dtype)))?
-                {
+                match type_from(*dtype)? {
                     Type::None => self.decode_unit(visitor),
                     Type::Bool => self.decode_bool(visitor),
                     Type::F32 => self.decode_f32(visitor),
@@ -603,6 +707,14 @@ impl<R: Read> de::Decoder for Decoder<R> {
     async fn decode_f64<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let f = self.parse_element().await?;
         visitor.visit_f64(f)
+    }
+
+    async fn decode_array_bool<V: Visitor>(
+        &mut self,
+        visitor: V,
+    ) -> Result<<V as Visitor>::Value, Self::Error> {
+        let access = ArrayAccess::new(self).await?;
+        visitor.visit_array_bool(access).await
     }
 
     async fn decode_string<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {

@@ -12,6 +12,7 @@ use futures::stream::{Stream, StreamExt, TryStreamExt};
 use num_traits::ToPrimitive;
 
 use super::constants::*;
+use super::element::IntoBytes;
 
 mod stream;
 
@@ -293,9 +294,44 @@ impl<'en> en::Encoder<'en> for Encoder {
         self.encode_type(&Type::F64, &v.to_be_bytes())
     }
 
+    fn encode_array_bool<
+        T: IntoIterator<Item = bool> + Send + Unpin + 'en,
+        S: Stream<Item = Result<T, Self::Error>> + Send + Unpin + 'en,
+    >(
+        self,
+        chunks: S,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
+    {
+        let mut start = BytesMut::with_capacity(2);
+        start.extend_from_slice(ARRAY_DELIMIT);
+        start.put_u8(Type::Bool.to_u8().unwrap());
+
+        let start = futures::stream::once(future::ready(Ok(Bytes::from(start))));
+        let end = delimiter(ARRAY_DELIMIT);
+
+        let contents = chunks.map_ok(|chunk| {
+            let mut encoded = BytesMut::new();
+            for b in chunk.into_iter() {
+                let as_bytes = b.into_bytes();
+                if &as_bytes[..] == ARRAY_DELIMIT || &as_bytes[..] == ESCAPE {
+                    encoded.extend_from_slice(ESCAPE);
+                }
+
+                encoded.put_slice(&as_bytes);
+            }
+            encoded.into()
+        });
+
+        let encoded: ByteStream = Box::pin(start.chain(contents).chain(end));
+
+        Ok(encoded)
+    }
+
     #[inline]
     fn encode_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(STRING_BEGIN[0], v.as_bytes(), STRING_END[0])
+        self.encode_string_type(STRING_DELIMIT[0], v.as_bytes(), STRING_DELIMIT[0])
     }
 
     #[inline]
