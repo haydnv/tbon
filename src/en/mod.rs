@@ -304,7 +304,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::Bool, chunks))
     }
 
     fn encode_array_i8<
@@ -317,7 +317,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::I8, chunks))
     }
 
     fn encode_array_i16<
@@ -330,7 +330,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::I16, chunks))
     }
 
     fn encode_array_i32<
@@ -343,7 +343,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::I32, chunks))
     }
 
     fn encode_array_i64<
@@ -356,7 +356,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::I64, chunks))
     }
 
     fn encode_array_u8<
@@ -369,7 +369,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::U8, chunks))
     }
 
     fn encode_array_u16<
@@ -382,7 +382,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::U16, chunks))
     }
 
     fn encode_array_u32<
@@ -395,7 +395,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::U32, chunks))
     }
 
     fn encode_array_u64<
@@ -408,7 +408,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::U64, chunks))
     }
 
     fn encode_array_f32<
@@ -421,7 +421,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::F32, chunks))
     }
 
     fn encode_array_f64<
@@ -434,7 +434,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
-        Ok(encode_array(chunks))
+        Ok(encode_array(Type::F64, chunks))
     }
 
     #[inline]
@@ -568,11 +568,12 @@ fn encode_array<
     S: Stream<Item = Result<T, Error>> + Send + Unpin + 'en,
     const SIZE: usize,
 >(
+    dtype: Type,
     chunks: S,
 ) -> ByteStream<'en> {
     let mut start = BytesMut::with_capacity(2);
     start.extend_from_slice(ARRAY_DELIMIT);
-    start.put_u8(Type::Bool.to_u8().unwrap());
+    start.put_u8(dtype.to_u8().unwrap());
 
     let start = futures::stream::once(future::ready(Ok(Bytes::from(start))));
     let end = delimiter(ARRAY_DELIMIT);

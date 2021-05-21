@@ -28,11 +28,9 @@ mod tests {
     use bytes::Bytes;
     use destream::{FromStream, IntoStream};
     use futures::{future, TryStreamExt};
-    use num_traits::ToPrimitive;
 
     use rand::Rng;
 
-    use super::constants::Type;
     use super::de::*;
     use super::en::*;
 
@@ -96,7 +94,7 @@ mod tests {
         map.insert(-1i32, String::from("\' \"\"     "));
         run_test(map).await;
 
-        let tuple: (Vec<f32>, Vec<i32>) = (vec![], vec![1]);
+        let tuple: (Bytes, HashMap<u64, String>) = (Bytes::new(), HashMap::new());
         run_test(tuple).await;
 
         let mut map = HashMap::new();
@@ -112,7 +110,7 @@ mod tests {
     async fn test_array() {
         #[derive(Eq, PartialEq)]
         struct TestArray {
-            data: Vec<bool>,
+            data: Vec<i16>,
         }
 
         struct TestVisitor;
@@ -125,12 +123,12 @@ mod tests {
                 "a TestArray"
             }
 
-            async fn visit_array_bool<A: destream::de::ArrayAccess<bool>>(
+            async fn visit_array_i16<A: destream::de::ArrayAccess<i16>>(
                 self,
                 mut array: A,
             ) -> Result<Self::Value, A::Error> {
                 let mut data = Vec::with_capacity(3);
-                let mut buffer = [false; 100];
+                let mut buffer = [0; 100];
                 loop {
                     let num_items = array.buffer(&mut buffer).await?;
                     if num_items > 0 {
@@ -152,7 +150,7 @@ mod tests {
                 _: (),
                 decoder: &mut D,
             ) -> Result<Self, D::Error> {
-                decoder.decode_array_bool(TestVisitor).await
+                decoder.decode_array_i16(TestVisitor).await
             }
         }
 
@@ -162,7 +160,7 @@ mod tests {
                 encoder: E,
             ) -> Result<E::Ok, E::Error> {
                 encoder
-                    .encode_array_bool(futures::stream::once(future::ready(Ok(self.data.to_vec()))))
+                    .encode_array_i16(futures::stream::once(future::ready(Ok(self.data.to_vec()))))
             }
         }
 
@@ -173,7 +171,7 @@ mod tests {
         }
 
         let test = TestArray {
-            data: vec![true, true, false],
+            data: vec![1, 2, 3],
         };
 
         let mut encoded = encode(&test).unwrap();
@@ -181,7 +179,6 @@ mod tests {
         while let Some(chunk) = encoded.try_next().await.unwrap() {
             buf.extend(chunk.to_vec());
         }
-        assert_eq!(&buf, &[b'=', Type::Bool.to_u8().unwrap(), 1, 1, 0, b'=']);
 
         let decoded: TestArray = try_decode((), encode(&test).unwrap()).await.unwrap();
         assert_eq!(test, decoded);

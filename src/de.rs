@@ -459,10 +459,18 @@ impl<R: Read> Decoder<R> {
             self.buffer.remove(0);
             Ok(())
         } else {
-            Err(de::Error::invalid_value(
-                self.buffer[0] as char,
-                &format!("{}", (delimiter[0] as char)),
-            ))
+            fn char_to_string(c: u8) -> String {
+                if c < ' ' as u8 {
+                    c.to_string()
+                } else {
+                    (c as char).to_string()
+                }
+            }
+
+            let actual = char_to_string(self.buffer[0]);
+            let expected = char_to_string(delimiter[0]);
+
+            Err(de::Error::invalid_value(actual, &expected))
         }
     }
 
