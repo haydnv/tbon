@@ -792,6 +792,7 @@ impl<R: Read> de::Decoder for Decoder<R> {
         }
 
         if Some(self.buffer[0]) == Type::None.to_u8() {
+            self.buffer.remove(0);
             visitor.visit_none()
         } else {
             visitor.visit_some(self).await

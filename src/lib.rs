@@ -80,6 +80,25 @@ mod tests {
         let list = vec![String::from("hello"), String::from("world")];
         run_test(list).await;
 
+        let mut map = HashMap::new();
+        map.insert(-1i32, String::from("I'm a teapot"));
+        map.insert(-1i32, String::from("\' \"\"     "));
+        run_test(map).await;
+
+        let mut map = HashMap::new();
+        map.insert("one".to_string(), HashMap::new());
+        map.insert(
+            "two".to_string(),
+            HashMap::from_iter(vec![("three".to_string(), 4f32)]),
+        );
+        run_test(map).await;
+    }
+
+    #[tokio::test]
+    async fn test_tuple() {
+        let tuple: (Bytes, HashMap<u64, String>) = (Bytes::new(), HashMap::new());
+        run_test(tuple).await;
+
         let tuple = (
             true,
             -1i16,
@@ -89,21 +108,9 @@ mod tests {
         );
         run_test(tuple).await;
 
-        let mut map = HashMap::new();
-        map.insert(-1i32, String::from("I'm a teapot"));
-        map.insert(-1i32, String::from("\' \"\"     "));
-        run_test(map).await;
-
-        let tuple: (Bytes, HashMap<u64, String>) = (Bytes::new(), HashMap::new());
+        let tuple: (bool, Vec<String>, Option<String>, Vec<String>, bool) =
+            (true, vec![], None, vec![], false);
         run_test(tuple).await;
-
-        let mut map = HashMap::new();
-        map.insert("one".to_string(), HashMap::new());
-        map.insert(
-            "two".to_string(),
-            HashMap::from_iter(vec![("three".to_string(), 4f32)]),
-        );
-        run_test(map).await;
     }
 
     #[tokio::test]
