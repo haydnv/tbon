@@ -166,8 +166,7 @@ mod tests {
                 &'en self,
                 encoder: E,
             ) -> Result<E::Ok, E::Error> {
-                encoder
-                    .encode_array_i16(futures::stream::once(future::ready(Ok(self.data.to_vec()))))
+                encoder.encode_array_i16(futures::stream::once(future::ready(self.data.to_vec())))
             }
         }
 
