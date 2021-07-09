@@ -14,6 +14,7 @@ pub trait Element: Sized {
     // TODO: use const generic Self::SIZE to return an array
     // fn to_bytes(&self) -> [u8; Self::SIZE];
 
+    #[inline]
     fn parse<E: de::Error>(bytes: &[u8]) -> Result<Self, E> {
         if bytes.len() == Self::SIZE {
             Ok(Self::from_bytes(bytes))
@@ -34,25 +35,12 @@ impl Element for bool {
         Type::Bool
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         if bytes[0] == 1 {
             true
-        } else if bytes[0] == 0 {
+        } else {
             false
-        } else {
-            panic!("invalid boolean: {}", bytes[0])
-        }
-    }
-
-    fn parse<E: de::Error>(bytes: &[u8]) -> Result<Self, E> {
-        if bytes.len() == Self::SIZE {
-            if bytes[0] == 0 || bytes[0] == 1 {
-                Ok(Self::from_bytes(bytes))
-            } else {
-                Err(de::Error::invalid_value(bytes[0], "1 or 0 (true or false)"))
-            }
-        } else {
-            Err(de::Error::invalid_length(bytes.len(), Self::SIZE))
         }
     }
 }
@@ -74,6 +62,7 @@ impl Element for u8 {
         Type::U8
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         bytes[0]
     }
@@ -92,6 +81,7 @@ impl Element for u16 {
         Type::U16
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -110,6 +100,7 @@ impl Element for u32 {
         Type::U32
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -128,6 +119,7 @@ impl Element for u64 {
         Type::U64
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -146,6 +138,7 @@ impl Element for i8 {
         Type::I8
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -164,6 +157,7 @@ impl Element for i16 {
         Type::I16
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -182,6 +176,7 @@ impl Element for i32 {
         Type::I32
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -200,6 +195,7 @@ impl Element for i64 {
         Type::I64
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -218,6 +214,7 @@ impl Element for f32 {
         Type::F32
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }
@@ -236,6 +233,7 @@ impl Element for f64 {
         Type::F64
     }
 
+    #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
     }

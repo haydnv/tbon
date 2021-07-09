@@ -1,6 +1,6 @@
 [package]
 name = "tbon"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["haydn@tinychain.net"]
 edition = "2018"
 description = "Tinychain Binary Object Notation is a compact and versatile stream-friendly binary serialization format"
@@ -24,9 +24,9 @@ futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.3"
 pin-project = "1.0"
-tokio = { version = "1.2", features = ["io-util"], optional = true }
+tokio = { version = "1.8", features = ["io-util"], optional = true }
 
 [dev-dependencies]
 rand = "0.8"
-tokio = { version = "1.2", features = ["macros"] }
+tokio = { version = "1.8", features = ["macros"] }
 tokio-test = "0.4"

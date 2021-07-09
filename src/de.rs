@@ -199,12 +199,11 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
             }
         }
 
-        let mut i = 0;
         let mut elements = 0;
-        while i < escaped.len() {
-            buffer[elements] = T::from_bytes(&escaped[i..i + size]);
+
+        for bytes in escaped.chunks(size) {
+            buffer[elements] = T::parse(bytes)?;
             elements += 1;
-            i += size;
         }
 
         if self.done {
