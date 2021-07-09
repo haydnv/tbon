@@ -184,9 +184,16 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
             i += 1;
         }
 
+        let limit = if self.done {
+            self.decoder.buffer.pop(); // process the end delimiter
+            self.decoder.buffer.len()
+        } else {
+            i
+        };
+
         let mut escape = false;
-        let mut escaped = BytesMut::with_capacity(i);
-        for byte in self.decoder.buffer.drain(0..i) {
+        let mut escaped = BytesMut::with_capacity(buffer.len() * size);
+        for byte in self.decoder.buffer.drain(0..limit) {
             let as_slice = std::slice::from_ref(&byte);
 
             if escape {
@@ -204,10 +211,6 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
         for bytes in escaped.chunks(size) {
             buffer[elements] = T::parse(bytes)?;
             elements += 1;
-        }
-
-        if self.done {
-            self.decoder.buffer.remove(0); // process the end delimiter
         }
 
         self.decoder.buffer.shrink_to_fit();

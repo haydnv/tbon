@@ -177,7 +177,7 @@ mod tests {
         }
 
         let test = TestArray {
-            data: vec![1, 2, 3],
+            data: (0..512).collect(),
         };
 
         let mut encoded = encode(&test).unwrap();

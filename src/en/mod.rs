@@ -553,12 +553,14 @@ fn encode_array<
     let contents = chunks.map(|chunk| {
         let mut encoded = BytesMut::new();
         for b in chunk.into_iter() {
-            let as_bytes = b.into_bytes();
-            if &as_bytes[..] == ARRAY_DELIMIT || &as_bytes[..] == ESCAPE {
-                encoded.extend_from_slice(ESCAPE);
-            }
+            for byte in b.into_bytes() {
+                let as_slice = std::slice::from_ref(&byte);
+                if as_slice == ARRAY_DELIMIT || as_slice == ESCAPE {
+                    encoded.extend_from_slice(ESCAPE);
+                }
 
-            encoded.put_slice(&as_bytes);
+                encoded.put_u8(byte);
+            }
         }
 
         Ok(encoded.into())
