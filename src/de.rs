@@ -645,21 +645,6 @@ impl<R: Read> Decoder<R> {
             },
         }
     }
-
-    async fn is_terminated(&mut self) -> Result<bool, Error> {
-        if self.source.is_terminated() {
-            return Ok(true);
-        }
-
-        match self.source.next().await {
-            Some(Ok(chunk)) => {
-                self.buffer.extend(chunk);
-                Ok(false)
-            }
-            Some(Err(cause)) => Err(cause),
-            None => Ok(true),
-        }
-    }
 }
 
 #[async_trait]
@@ -891,17 +876,7 @@ pub async fn decode<S: Stream<Item = Bytes> + Send + Unpin, T: FromStream>(
     source: S,
 ) -> Result<T, Error> {
     let mut decoder = Decoder::from_stream(source.map(Result::<Bytes, Error>::Ok));
-    let decoded = T::from_stream(context, &mut decoder).await?;
-
-    if decoder.is_terminated().await? {
-        Ok(decoded)
-    } else {
-        let snippet = decoder.contents(SNIPPET_LEN);
-        Err(de::Error::custom(format!(
-            "finished decoding but the stream still has content: {}",
-            snippet
-        )))
-    }
+    T::from_stream(context, &mut decoder).await
 }
 
 /// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
@@ -914,17 +889,7 @@ pub async fn try_decode<
     source: S,
 ) -> Result<T, Error> {
     let mut decoder = Decoder::from_stream(source.map_err(|e| de::Error::custom(e)));
-    let decoded = T::from_stream(context, &mut decoder).await?;
-
-    if decoder.is_terminated().await? {
-        Ok(decoded)
-    } else {
-        let snippet = decoder.contents(SNIPPET_LEN);
-        Err(de::Error::custom(format!(
-            "finished decoding but the stream still has content: {}",
-            snippet
-        )))
-    }
+    T::from_stream(context, &mut decoder).await
 }
 
 /// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
