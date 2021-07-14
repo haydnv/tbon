@@ -16,6 +16,7 @@ use super::constants::*;
 use super::Element;
 
 const CHUNK_SIZE: usize = 4096;
+const SNIPPET_LEN: usize = 10;
 
 #[async_trait]
 pub trait Read: Send + Unpin {
@@ -253,6 +254,12 @@ impl<'a, S: Read + 'a> de::MapAccess for MapAccess<'a, S> {
     }
 
     async fn next_value<V: FromStream>(&mut self, context: V::Context) -> Result<V, Error> {
+        if self.done {
+            return Err(de::Error::custom(
+                "called MapAccess::next_value but the map has already ended",
+            ));
+        }
+
         let value = V::from_stream(context, self.decoder).await?;
 
         if self.decoder.maybe_delimiter(MAP_END).await? {
@@ -320,6 +327,34 @@ impl<'a, S: Read + 'a> de::SeqAccess for SeqAccess<'a, S> {
 pub struct Decoder<R> {
     source: R,
     buffer: Vec<u8>,
+}
+
+impl<R> Decoder<R> {
+    fn contents(&self, max_len: usize) -> String {
+        let len = Ord::min(self.buffer.len(), max_len);
+        let mut chunks: Vec<String> = Vec::with_capacity(len);
+        let mut chunk = Vec::with_capacity(len);
+        let mut is_ascii = false;
+        for c in &self.buffer[..len] {
+            if is_ascii != c.is_ascii() {
+                chunks.push(chunk.iter().collect());
+                chunk.clear();
+                is_ascii = c.is_ascii();
+            }
+
+            if c.is_ascii() {
+                chunk.push(*c as char);
+            } else {
+                chunk.extend(format!(" {} ", c).as_bytes().iter().map(|c| *c as char))
+            }
+        }
+
+        if !chunk.is_empty() {
+            chunks.push(chunk.into_iter().collect());
+        }
+
+        chunks.join("")
+    }
 }
 
 #[cfg(feature = "tokio-io")]
@@ -469,7 +504,11 @@ impl<R: Read> Decoder<R> {
             let actual = char_to_string(self.buffer[0]);
             let expected = char_to_string(delimiter[0]);
 
-            Err(de::Error::invalid_value(actual, &expected))
+            let snippet = self.contents(SNIPPET_LEN);
+            Err(de::Error::custom(format!(
+                "unexpected delimiter {}, expected {} at {}",
+                actual, expected, snippet
+            )))
         }
     }
 
@@ -604,6 +643,21 @@ impl<R: Read> Decoder<R> {
                 Some(dtype) => Err(de::Error::invalid_type(dtype, Type::None)),
                 None => Err(de::Error::invalid_type("(unknown)", Type::None)),
             },
+        }
+    }
+
+    async fn is_terminated(&mut self) -> Result<bool, Error> {
+        if self.source.is_terminated() {
+            return Ok(true);
+        }
+
+        match self.source.next().await {
+            Some(Ok(chunk)) => {
+                self.buffer.extend(chunk);
+                Ok(false)
+            }
+            Some(Err(cause)) => Err(cause),
+            None => Ok(true),
         }
     }
 }
@@ -837,7 +891,17 @@ pub async fn decode<S: Stream<Item = Bytes> + Send + Unpin, T: FromStream>(
     source: S,
 ) -> Result<T, Error> {
     let mut decoder = Decoder::from_stream(source.map(Result::<Bytes, Error>::Ok));
-    T::from_stream(context, &mut decoder).await
+    let decoded = T::from_stream(context, &mut decoder).await?;
+
+    if decoder.is_terminated().await? {
+        Ok(decoded)
+    } else {
+        let snippet = decoder.contents(SNIPPET_LEN);
+        Err(de::Error::custom(format!(
+            "finished decoding but the stream still has content: {}",
+            snippet
+        )))
+    }
 }
 
 /// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
@@ -850,7 +914,17 @@ pub async fn try_decode<
     source: S,
 ) -> Result<T, Error> {
     let mut decoder = Decoder::from_stream(source.map_err(|e| de::Error::custom(e)));
-    T::from_stream(context, &mut decoder).await
+    let decoded = T::from_stream(context, &mut decoder).await?;
+
+    if decoder.is_terminated().await? {
+        Ok(decoded)
+    } else {
+        let snippet = decoder.contents(SNIPPET_LEN);
+        Err(de::Error::custom(format!(
+            "finished decoding but the stream still has content: {}",
+            snippet
+        )))
+    }
 }
 
 /// Decode the given TBON-encoded stream of bytes into an instance of `T` using the given context.
