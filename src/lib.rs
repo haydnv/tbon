@@ -33,13 +33,12 @@ mod tests {
 
     use super::de::*;
     use super::en::*;
+    use num_traits::Signed;
 
-    async fn run_test<
-        'en,
+    async fn run_test<'en, T>(value: T)
+    where
         T: FromStream<Context = ()> + IntoStream<'en> + fmt::Debug + PartialEq + Clone + 'en,
-    >(
-        value: T,
-    ) {
+    {
         let encoded = encode(value.clone()).unwrap();
         let decoded: T = try_decode((), encoded).await.unwrap();
         assert_eq!(decoded, value);
@@ -62,6 +61,33 @@ mod tests {
             let f: f32 = rand::thread_rng().gen();
             run_test(f).await;
         }
+    }
+
+    #[tokio::test]
+    async fn test_undefined_numbers() {
+        async fn recode<'en, T>(value: T) -> T
+        where
+            T: FromStream<Context = ()> + IntoStream<'en> + fmt::Debug + PartialEq + Clone + 'en,
+        {
+            let encoded = encode(value.clone()).unwrap();
+            try_decode((), encoded).await.unwrap()
+        }
+
+        assert!(recode(f32::NAN).await.is_nan());
+
+        let inf = recode(f32::INFINITY).await;
+        assert!(inf.is_infinite() && inf.is_positive());
+
+        let inf = recode(f32::NEG_INFINITY).await;
+        assert!(inf.is_infinite() && inf.is_negative());
+
+        assert!(recode(f64::NAN).await.is_nan());
+
+        let inf = recode(f64::INFINITY).await;
+        assert!(inf.is_infinite() && inf.is_sign_positive());
+
+        let inf = recode(f64::NEG_INFINITY).await;
+        assert!(inf.is_infinite() && inf.is_sign_negative());
     }
 
     #[tokio::test]
