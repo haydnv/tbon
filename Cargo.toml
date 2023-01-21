@@ -19,14 +19,14 @@ all = ["tokio-io"]
 [dependencies]
 async-trait = "0.1"
 bytes = "1.0"
-destream = { path = "../destream" }
+destream = "0.6"
 futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.3"
 pin-project = "1.0"
-tokio = { version = "1.9", features = ["io-util"], optional = true }
+tokio = { version = "1.24", features = ["io-util"], optional = true }
 
 [dev-dependencies]
 rand = "0.8"
-tokio = { version = "1.9", features = ["macros"] }
+tokio = { version = "1.24", features = ["macros"] }
 tokio-test = "0.4"

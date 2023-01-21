@@ -16,8 +16,10 @@ use super::element::IntoBytes;
 
 mod stream;
 
+/// A [`Stream`] of [`Bytes`] chunks
 pub type ByteStream<'en> = Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en>>;
 
+/// An encoding error
 pub struct Error {
     message: String,
 }
@@ -44,6 +46,7 @@ impl fmt::Display for Error {
     }
 }
 
+/// An [`Encoder`] for a map of keys to values
 pub struct MapEncoder<'en> {
     pending_key: Option<ByteStream<'en>>,
     entries: VecDeque<(ByteStream<'en>, ByteStream<'en>)>,
@@ -116,6 +119,7 @@ impl<'en> en::EncodeMap<'en> for MapEncoder<'en> {
     }
 }
 
+/// An [`Encoder`] for a sequence of values
 pub struct SequenceEncoder<'en> {
     items: VecDeque<ByteStream<'en>>,
 }
@@ -187,6 +191,7 @@ impl<'en> en::EncodeTuple<'en> for SequenceEncoder<'en> {
     }
 }
 
+/// A TBON encoder
 pub struct Encoder;
 
 impl Encoder {
@@ -440,11 +445,6 @@ impl<'en> en::Encoder<'en> for Encoder {
     #[inline]
     fn encode_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
         self.encode_string_type(STRING_DELIMIT[0], v.as_bytes(), STRING_DELIMIT[0])
-    }
-
-    #[inline]
-    fn encode_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.encode_string_type(BITSTRING_BEGIN[0], v, BITSTRING_END[0])
     }
 
     #[inline]

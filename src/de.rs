@@ -18,13 +18,17 @@ use super::Element;
 const CHUNK_SIZE: usize = 4096;
 const SNIPPET_LEN: usize = 10;
 
+/// Methods common to any decodable [`Stream`]
 #[async_trait]
 pub trait Read: Send + Unpin {
+    /// Read the next chunk of [`Bytes`] in the [`Stream`], if any.
     async fn next(&mut self) -> Option<Result<Bytes, Error>>;
 
+    /// Return `true` if there is no more content to be read from the [`Stream`].
     fn is_terminated(&self) -> bool;
 }
 
+/// A [`Stream`] to decode
 pub struct SourceStream<S> {
     source: Fuse<S>,
 }
@@ -48,6 +52,7 @@ impl<S: Stream> From<S> for SourceStream<S> {
     }
 }
 
+/// A buffered reader of a decodable stream
 #[cfg(feature = "tokio-io")]
 pub struct SourceReader<R: AsyncRead> {
     reader: BufReader<R>,
@@ -374,6 +379,7 @@ impl<S: Stream> Decoder<SourceStream<S>>
 where
     SourceStream<S>: Read,
 {
+    /// Create a new [`Decoder`] from a source [`Stream`].
     pub fn from_stream(stream: S) -> Decoder<SourceStream<S>> {
         Decoder {
             source: SourceStream::from(stream),
@@ -521,9 +527,6 @@ impl<R: Read> Decoder<R> {
             Ok(())
         } else {
             match &[self.buffer[0]] {
-                BITSTRING_BEGIN => {
-                    self.ignore_string(BITSTRING_BEGIN, BITSTRING_END).await?;
-                }
                 LIST_BEGIN => {
                     self.ignore_string(LIST_BEGIN, LIST_END).await?;
                 }
@@ -619,10 +622,6 @@ impl<R: Read> Decoder<R> {
         N::parse(&bytes)
     }
 
-    async fn parse_bitstring(&mut self) -> Result<Bytes, Error> {
-        self.buffer_string(BITSTRING_BEGIN, BITSTRING_END).await
-    }
-
     async fn parse_string(&mut self) -> Result<String, Error> {
         let s = self.buffer_string(STRING_DELIMIT, STRING_DELIMIT).await?;
         String::from_utf8(s.to_vec()).map_err(Error::invalid_utf8)
@@ -676,7 +675,6 @@ impl<R: Read> de::Decoder for Decoder<R> {
                     dtype => return Err(de::Error::invalid_type(dtype, "a supported array type")),
                 }
             }
-            BITSTRING_BEGIN => self.decode_byte_buf(visitor).await,
             LIST_BEGIN => self.decode_seq(visitor).await,
             MAP_BEGIN => self.decode_map(visitor).await,
             STRING_DELIMIT => self.decode_string(visitor).await,
@@ -813,11 +811,6 @@ impl<R: Read> de::Decoder for Decoder<R> {
     async fn decode_string<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let s = self.parse_string().await?;
         visitor.visit_string(s)
-    }
-
-    async fn decode_byte_buf<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
-        let buf = self.parse_bitstring().await?;
-        visitor.visit_byte_buf(buf.to_vec())
     }
 
     async fn decode_option<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {

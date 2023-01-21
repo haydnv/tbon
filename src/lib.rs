@@ -2,9 +2,8 @@
 //!
 //! Example:
 //! ```
-//! # use bytes::Bytes;
 //! # use futures::executor::block_on;
-//! let expected = ("one".to_string(), 2.0, vec![3, 4], Bytes::from(vec![5u8]));
+//! let expected = ("one".to_string(), 2.0, vec![3, 4], vec![5u8]);
 //! let stream = tbon::en::encode(&expected).unwrap();
 //! let actual = block_on(tbon::de::try_decode((), stream)).unwrap();
 //! assert_eq!(expected, actual);
@@ -25,7 +24,6 @@ mod tests {
     use std::iter::FromIterator;
 
     use async_trait::async_trait;
-    use bytes::Bytes;
     use destream::{FromStream, IntoStream};
     use futures::{future, TryStreamExt};
 
@@ -96,9 +94,6 @@ mod tests {
         run_test(String::from("Привет, мир")).await;
         run_test(String::from("this is a \"string\" within a \\ string")).await;
         run_test(String::from("this \"string\" is \\\terminated by a \\")).await;
-
-        let bitstring = Bytes::from((0..255u8).collect::<Vec<u8>>());
-        run_test(bitstring).await;
     }
 
     #[tokio::test]
@@ -122,7 +117,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tuple() {
-        let tuple: (Bytes, HashMap<u64, String>) = (Bytes::new(), HashMap::new());
+        let tuple: (Vec<u8>, HashMap<u64, String>) = (Vec::new(), HashMap::new());
         run_test(tuple).await;
 
         let tuple = (
@@ -130,7 +125,7 @@ mod tests {
             -1i16,
             3.14,
             String::from(" hello \"world\""),
-            Bytes::from((0..255u8).collect::<Vec<u8>>()),
+            (0..255).collect::<Vec<u8>>(),
         );
         run_test(tuple).await;
 
