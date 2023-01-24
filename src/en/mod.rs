@@ -10,9 +10,10 @@ use destream::{en, IntoStream};
 use futures::future;
 use futures::stream::{Stream, StreamExt};
 use num_traits::ToPrimitive;
+use uuid::Uuid;
 
 use super::constants::*;
-use super::element::IntoBytes;
+use super::element::{Element, IntoBytes};
 
 mod stream;
 
@@ -97,7 +98,7 @@ impl<'en> en::EncodeMap<'en> for MapEncoder<'en> {
         let mut key = None;
         mem::swap(&mut self.pending_key, &mut key);
 
-        self.entries.push_back((key.unwrap(), value));
+        self.entries.push_back((key.expect("key"), value));
         Ok(())
     }
 
@@ -198,7 +199,7 @@ impl Encoder {
     #[inline]
     fn encode_type<'en>(&self, dtype: &Type, value: &[u8]) -> Result<ByteStream<'en>, Error> {
         let mut chunk = BytesMut::with_capacity(value.len() + 1);
-        chunk.put_u8(dtype.to_u8().unwrap());
+        chunk.put_u8(dtype.to_u8().expect("type bit"));
         chunk.extend_from_slice(value);
 
         Ok(Box::pin(futures::stream::once(future::ready(Ok(
@@ -251,6 +252,11 @@ impl<'en> en::Encoder<'en> for Encoder {
     }
 
     #[inline]
+    fn encode_bytes<B: Into<Bytes>>(self, bytes: B) -> Result<Self::Ok, Self::Error> {
+        self.collect_bytes(bytes.into())
+    }
+
+    #[inline]
     fn encode_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
         self.encode_type(&Type::I8, &v.to_be_bytes())
     }
@@ -299,144 +305,100 @@ impl<'en> en::Encoder<'en> for Encoder {
         self.encode_type(&Type::F64, &v.to_be_bytes())
     }
 
-    fn encode_array_bool<
+    fn encode_array_bool<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = bool> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::Bool, chunks))
     }
 
-    fn encode_array_i8<
+    fn encode_array_i8<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = i8> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::I8, chunks))
     }
 
-    fn encode_array_i16<
+    fn encode_array_i16<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = i16> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::I16, chunks))
     }
 
-    fn encode_array_i32<
+    fn encode_array_i32<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = i32> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::I32, chunks))
     }
 
-    fn encode_array_i64<
+    fn encode_array_i64<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = i64> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::I64, chunks))
     }
 
-    fn encode_array_u8<
+    fn encode_array_u8<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = u8> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::U8, chunks))
     }
 
-    fn encode_array_u16<
+    fn encode_array_u16<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = u16> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::U16, chunks))
     }
 
-    fn encode_array_u32<
+    fn encode_array_u32<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = u32> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::U32, chunks))
     }
 
-    fn encode_array_u64<
+    fn encode_array_u64<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = u64> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::U64, chunks))
     }
 
-    fn encode_array_f32<
+    fn encode_array_f32<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = f32> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::F32, chunks))
     }
 
-    fn encode_array_f64<
+    fn encode_array_f64<T, S>(self, chunks: S) -> Result<Self::Ok, Self::Error>
+    where
         T: IntoIterator<Item = f64> + Send + Unpin + 'en,
         S: Stream<Item = T> + Send + Unpin + 'en,
-    >(
-        self,
-        chunks: S,
-    ) -> Result<Self::Ok, Self::Error>
-    where
         <T as IntoIterator>::IntoIter: Send + Unpin + 'en,
     {
         Ok(encode_array(Type::F64, chunks))
@@ -450,7 +412,7 @@ impl<'en> en::Encoder<'en> for Encoder {
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         Ok(Box::pin(futures::stream::once(future::ready(Ok(
-            Bytes::from(vec![(&Type::None).to_u8().unwrap()]),
+            Bytes::from(vec![(&Type::None).to_u8().expect("type bit")]),
         )))))
     }
 
@@ -465,19 +427,22 @@ impl<'en> en::Encoder<'en> for Encoder {
     }
 
     #[inline]
+    fn encode_uuid(self, uuid: Uuid) -> Result<Self::Ok, Self::Error> {
+        self.collect_bytes(uuid.as_bytes().into_iter().copied())
+    }
+
+    #[inline]
     fn encode_map(self, size_hint: Option<usize>) -> Result<Self::EncodeMap, Self::Error> {
         Ok(MapEncoder::new(size_hint))
     }
 
     #[inline]
-    fn encode_map_stream<
+    fn encode_map_stream<K, V, S>(self, map: S) -> Result<Self::Ok, Self::Error>
+    where
         K: en::IntoStream<'en> + 'en,
         V: en::IntoStream<'en> + 'en,
         S: Stream<Item = (K, V)> + Send + Unpin + 'en,
-    >(
-        self,
-        map: S,
-    ) -> Result<Self::Ok, Self::Error> {
+    {
         Ok(Box::pin(stream::encode_map(map)))
     }
 
@@ -498,6 +463,33 @@ impl<'en> en::Encoder<'en> for Encoder {
     fn encode_tuple(self, len: usize) -> Result<Self::EncodeTuple, Self::Error> {
         Ok(SequenceEncoder::new(Some(len)))
     }
+
+    #[inline]
+    fn collect_bytes<B: IntoIterator<Item = u8>>(self, bytes: B) -> Result<Self::Ok, Self::Error> {
+        let bytes = bytes.into_iter();
+        let mut array = match bytes.size_hint() {
+            (0, None) | (0, Some(usize::MAX)) => Vec::new(),
+            (_min, Some(max)) => Vec::with_capacity(max + 3),
+            (min, None) => Vec::with_capacity(min),
+        };
+
+        array.extend_from_slice(ARRAY_DELIMIT);
+        array.push(u8::dtype().to_u8().expect("type bit"));
+
+        for byte in bytes {
+            let as_slice = std::slice::from_ref(&byte);
+            if as_slice == ARRAY_DELIMIT || as_slice == ESCAPE {
+                array.extend_from_slice(ESCAPE);
+            }
+
+            array.put_u8(byte);
+        }
+
+        array.extend_from_slice(ARRAY_DELIMIT);
+
+        let array: ByteStream = Box::pin(futures::stream::once(future::ready(Ok(array.into()))));
+        Ok(array)
+    }
 }
 
 #[inline]
@@ -515,37 +507,37 @@ pub fn encode<'en, T: IntoStream<'en> + 'en>(
 }
 
 /// Given a stream of encodable key-value pairs, return an encoded map stream.
-pub fn encode_map<
-    'en,
+pub fn encode_map<'en, K, V, S>(
+    seq: S,
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en
+where
     K: IntoStream<'en> + 'en,
     V: IntoStream<'en> + 'en,
     S: Stream<Item = (K, V)> + Send + Unpin + 'en,
->(
-    seq: S,
-) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+{
     stream::encode_map(seq)
 }
 
 /// Given a stream of encodable elements, return an encoded sequence stream.
-pub fn encode_seq<'en, T: IntoStream<'en> + 'en, S: Stream<Item = T> + Send + Unpin + 'en>(
+pub fn encode_seq<'en, T, S>(
     seq: S,
-) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en {
+) -> impl Stream<Item = Result<Bytes, Error>> + Send + Unpin + 'en
+where
+    T: IntoStream<'en> + 'en,
+    S: Stream<Item = T> + Send + Unpin + 'en,
+{
     stream::encode_list(seq)
 }
 
-fn encode_array<
-    'en,
+fn encode_array<'en, const SIZE: usize, E, T, S>(dtype: Type, chunks: S) -> ByteStream<'en>
+where
     E: IntoBytes<SIZE>,
     T: IntoIterator<Item = E>,
     S: Stream<Item = T> + Send + Unpin + 'en,
-    const SIZE: usize,
->(
-    dtype: Type,
-    chunks: S,
-) -> ByteStream<'en> {
+{
     let mut start = BytesMut::with_capacity(2);
     start.extend_from_slice(ARRAY_DELIMIT);
-    start.put_u8(dtype.to_u8().unwrap());
+    start.put_u8(dtype.to_u8().expect("type bit"));
 
     let start = futures::stream::once(future::ready(Ok(Bytes::from(start))));
     let end = delimiter(ARRAY_DELIMIT);
@@ -567,6 +559,5 @@ fn encode_array<
     });
 
     let encoded: ByteStream = Box::pin(start.chain(contents).chain(end));
-
     encoded
 }

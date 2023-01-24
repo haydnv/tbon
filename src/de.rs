@@ -703,6 +703,10 @@ impl<R: Read> de::Decoder for Decoder<R> {
         visitor.visit_bool(b)
     }
 
+    async fn decode_bytes<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        self.decode_array_u8(visitor).await
+    }
+
     async fn decode_i8<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let i = self.parse_element().await?;
         visitor.visit_i8(i)
@@ -830,14 +834,14 @@ impl<R: Read> de::Decoder for Decoder<R> {
         }
     }
 
+    async fn decode_map<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        let access = MapAccess::new(self, None).await?;
+        visitor.visit_map(access).await
+    }
+
     async fn decode_seq<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = SeqAccess::new(self, None).await?;
         visitor.visit_seq(access).await
-    }
-
-    async fn decode_unit<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
-        self.parse_unit().await?;
-        visitor.visit_unit()
     }
 
     async fn decode_tuple<V: Visitor>(
@@ -849,9 +853,13 @@ impl<R: Read> de::Decoder for Decoder<R> {
         visitor.visit_seq(access).await
     }
 
-    async fn decode_map<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
-        let access = MapAccess::new(self, None).await?;
-        visitor.visit_map(access).await
+    async fn decode_unit<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        self.parse_unit().await?;
+        visitor.visit_unit()
+    }
+
+    async fn decode_uuid<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
+        self.decode_array_u8(visitor).await
     }
 
     async fn decode_ignored_any<V: Visitor>(
