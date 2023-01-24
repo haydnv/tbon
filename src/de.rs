@@ -681,6 +681,15 @@ impl<R: Read> de::Decoder for Decoder<R> {
 
                 match type_from(self.buffer[1])? {
                     Type::Bool => self.decode_array_bool(visitor).await,
+                    Type::F32 => self.decode_array_f32(visitor).await,
+                    Type::F64 => self.decode_array_f64(visitor).await,
+                    Type::I16 => self.decode_array_i16(visitor).await,
+                    Type::I32 => self.decode_array_i32(visitor).await,
+                    Type::I64 => self.decode_array_i64(visitor).await,
+                    Type::U8 => self.decode_array_u8(visitor).await,
+                    Type::U16 => self.decode_array_u16(visitor).await,
+                    Type::U32 => self.decode_array_u32(visitor).await,
+                    Type::U64 => self.decode_array_u64(visitor).await,
                     dtype => return Err(de::Error::invalid_type(dtype, "a supported array type")),
                 }
             }
