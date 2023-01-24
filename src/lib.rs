@@ -24,6 +24,7 @@ mod tests {
     use std::iter::FromIterator;
 
     use async_trait::async_trait;
+    use bytes::Bytes;
     use destream::{FromStream, IntoStream};
     use futures::{future, TryStreamExt};
 
@@ -32,6 +33,7 @@ mod tests {
     use super::de::*;
     use super::en::*;
     use num_traits::Signed;
+    use uuid::Uuid;
 
     async fn run_test<'en, T>(value: T)
     where
@@ -210,5 +212,15 @@ mod tests {
 
         let decoded: TestArray = try_decode((), encode(&test).unwrap()).await.unwrap();
         assert_eq!(test, decoded);
+    }
+
+    #[tokio::test]
+    async fn test_bytes() {
+        run_test(Bytes::from(vec![1, 2, 3])).await;
+    }
+
+    #[tokio::test]
+    async fn test_uuid() {
+        run_test(Uuid::from_bytes([0u8; 16].into())).await;
     }
 }
