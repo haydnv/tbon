@@ -19,7 +19,7 @@ pub mod en;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
     use std::fmt;
     use std::iter::FromIterator;
 
@@ -135,6 +135,17 @@ mod tests {
             (true, vec![], None, vec![], false);
 
         run_test(tuple).await;
+
+        let tuple: (Bytes, BTreeMap<u64, String>) = (vec![1, 2, 3].into(), BTreeMap::new());
+        run_test(tuple).await;
+
+        let one = Bytes::from(vec![1, 2, 3]);
+        let two = BTreeMap::new();
+        let tuple: (&Bytes, &BTreeMap<u64, String>) = (&one, &two);
+
+        let encoded = encode(tuple).unwrap();
+        let decoded: (Bytes, BTreeMap<u64, String>) = try_decode((), encoded).await.unwrap();
+        assert_eq!(decoded, (one, two));
     }
 
     #[tokio::test]

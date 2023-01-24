@@ -142,7 +142,7 @@ impl<'a, S: Read + 'a, T: Element> ArrayAccess<'a, S, T> {
         decoder.expect_delimiter(ARRAY_DELIMIT).await?;
         decoder.expect_delimiter(dtype).await?;
 
-        let done = decoder.maybe_delimiter(MAP_END).await?;
+        let done = decoder.maybe_delimiter(ARRAY_DELIMIT).await?;
 
         Ok(ArrayAccess {
             decoder,
@@ -176,7 +176,6 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
                 && &self.decoder.buffer[i..i + 1] == ARRAY_DELIMIT
                 && !escaped
             {
-                self.done = true;
                 break;
             }
 
@@ -212,8 +211,18 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
             elements += 1;
         }
 
-        if self.done {
-            self.decoder.buffer.pop(); // process the end delimiter
+        while self.decoder.buffer.is_empty() {
+            if self.decoder.source.is_terminated() {
+                return Err(Error::unexpected_end());
+            } else {
+                self.decoder.buffer().await?;
+            }
+        }
+
+        if &self.decoder.buffer[0..1] == ARRAY_DELIMIT {
+            self.done = true;
+            // process the end delimiter
+            self.decoder.buffer.remove(0);
         }
 
         self.decoder.buffer.shrink_to_fit();
