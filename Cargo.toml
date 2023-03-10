@@ -18,8 +18,8 @@ all = ["tokio-io"]
 
 [dependencies]
 async-trait = "0.1"
-bytes = "1.0"
-destream = "~0.6.1"
+bytes = "1.4"
+destream = { path = "../destream" }
 futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.3"
