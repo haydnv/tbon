@@ -190,7 +190,7 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
         }
 
         let mut escape = false;
-        let mut escaped = BytesMut::with_capacity(buffer.len() * size);
+        let mut escaped = BytesMut::with_capacity(i);
         for byte in self.decoder.buffer.drain(0..i) {
             let as_slice = std::slice::from_ref(&byte);
 
@@ -226,6 +226,7 @@ impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a,
         }
 
         self.decoder.buffer.shrink_to_fit();
+
         Ok(elements)
     }
 }

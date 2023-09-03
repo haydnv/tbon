@@ -544,6 +544,7 @@ where
 
     let contents = chunks.map(|chunk| {
         let mut encoded = BytesMut::new();
+
         for b in chunk.into_iter() {
             for byte in b.into_bytes() {
                 let as_slice = std::slice::from_ref(&byte);
