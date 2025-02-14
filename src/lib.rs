@@ -23,7 +23,6 @@ mod tests {
     use std::fmt;
     use std::iter::FromIterator;
 
-    use async_trait::async_trait;
     use bytes::Bytes;
     use destream::{FromStream, IntoStream};
     use futures::{future, TryStreamExt};
@@ -157,7 +156,6 @@ mod tests {
 
         struct TestVisitor;
 
-        #[async_trait]
         impl destream::de::Visitor for TestVisitor {
             type Value = TestArray;
 
@@ -184,7 +182,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl FromStream for TestArray {
             type Context = ();
 
