@@ -58,7 +58,7 @@ mod tests {
         }
 
         for _ in 0..100000 {
-            let f: f32 = rand::thread_rng().gen();
+            let f: f32 = rand::rng().random();
             run_test(f).await;
         }
     }
