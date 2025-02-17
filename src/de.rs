@@ -3,10 +3,10 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use destream::{de, FromStream, Visitor};
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStreamExt};
+use futures::FutureExt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
 #[cfg(feature = "tokio-io")]
@@ -19,7 +19,7 @@ const CHUNK_SIZE: usize = 4096;
 const SNIPPET_LEN: usize = 10;
 
 /// Methods common to any decodable [`Stream`]
-#[async_trait]
+#[trait_variant::make(Send)]
 pub trait Read: Send + Unpin {
     /// Read the next chunk of [`Bytes`] in the [`Stream`], if any.
     async fn next(&mut self) -> Option<Result<Bytes, Error>>;
@@ -33,7 +33,6 @@ pub struct SourceStream<S> {
     source: Fuse<S>,
 }
 
-#[async_trait]
 impl<S: Stream<Item = Result<Bytes, Error>> + Send + Unpin> Read for SourceStream<S> {
     async fn next(&mut self) -> Option<Result<Bytes, Error>> {
         self.source.next().await
@@ -59,7 +58,6 @@ pub struct SourceReader<R: AsyncRead> {
     terminated: bool,
 }
 
-#[async_trait]
 #[cfg(feature = "tokio-io")]
 impl<R: AsyncRead + Send + Unpin> Read for SourceReader<R> {
     async fn next(&mut self) -> Option<Result<Bytes, Error>> {
@@ -152,7 +150,6 @@ impl<'a, S: Read + 'a, T: Element> ArrayAccess<'a, S, T> {
     }
 }
 
-#[async_trait]
 impl<'a, S: Read + 'a, T: Element + Send> de::ArrayAccess<T> for ArrayAccess<'a, S, T> {
     type Error = Error;
 
@@ -254,7 +251,6 @@ impl<'a, S: Read + 'a> MapAccess<'a, S> {
     }
 }
 
-#[async_trait]
 impl<'a, S: Read + 'a> de::MapAccess for MapAccess<'a, S> {
     type Error = Error;
 
@@ -312,7 +308,6 @@ impl<'a, S: Read + 'a> SeqAccess<'a, S> {
     }
 }
 
-#[async_trait]
 impl<'a, S: Read + 'a> de::SeqAccess for SeqAccess<'a, S> {
     type Error = Error;
 
@@ -656,7 +651,6 @@ impl<R: Read> Decoder<R> {
     }
 }
 
-#[async_trait]
 impl<R: Read> de::Decoder for Decoder<R> {
     type Error = Error;
 
@@ -697,23 +691,20 @@ impl<R: Read> de::Decoder for Decoder<R> {
             LIST_BEGIN => self.decode_seq(visitor).await,
             MAP_BEGIN => self.decode_map(visitor).await,
             STRING_DELIMIT => self.decode_string(visitor).await,
-            [dtype] => {
-                match type_from(*dtype)? {
-                    Type::None => self.decode_unit(visitor),
-                    Type::Bool => self.decode_bool(visitor),
-                    Type::F32 => self.decode_f32(visitor),
-                    Type::F64 => self.decode_f64(visitor),
-                    Type::I8 => self.decode_i8(visitor),
-                    Type::I16 => self.decode_i16(visitor),
-                    Type::I32 => self.decode_i32(visitor),
-                    Type::I64 => self.decode_i64(visitor),
-                    Type::U8 => self.decode_u8(visitor),
-                    Type::U16 => self.decode_u16(visitor),
-                    Type::U32 => self.decode_u32(visitor),
-                    Type::U64 => self.decode_u64(visitor),
-                }
-                .await
-            }
+            [dtype] => match type_from(*dtype)? {
+                Type::None => self.decode_unit(visitor).await,
+                Type::Bool => self.decode_bool(visitor).await,
+                Type::F32 => self.decode_f32(visitor).await,
+                Type::F64 => self.decode_f64(visitor).await,
+                Type::I8 => self.decode_i8(visitor).await,
+                Type::I16 => self.decode_i16(visitor).await,
+                Type::I32 => self.decode_i32(visitor).await,
+                Type::I64 => self.decode_i64(visitor).await,
+                Type::U8 => self.decode_u8(visitor).await,
+                Type::U16 => self.decode_u16(visitor).await,
+                Type::U32 => self.decode_u32(visitor).await,
+                Type::U64 => self.decode_u64(visitor).await,
+            },
         }
     }
 
@@ -778,57 +769,58 @@ impl<R: Read> de::Decoder for Decoder<R> {
 
     async fn decode_array_bool<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_bool(access).await
+        // TODO: remove boxing when https://github.com/rust-lang/rust/issues/100013 is resolved
+        visitor.visit_array_bool(access).boxed().await
     }
 
     async fn decode_array_i8<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_i8(access).await
+        visitor.visit_array_i8(access).boxed().await
     }
 
     async fn decode_array_i16<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_i16(access).await
+        visitor.visit_array_i16(access).boxed().await
     }
 
     async fn decode_array_i32<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_i32(access).await
+        visitor.visit_array_i32(access).boxed().await
     }
 
     async fn decode_array_i64<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_i64(access).await
+        visitor.visit_array_i64(access).boxed().await
     }
 
     async fn decode_array_u8<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_u8(access).await
+        visitor.visit_array_u8(access).boxed().await
     }
 
     async fn decode_array_u16<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_u16(access).await
+        visitor.visit_array_u16(access).boxed().await
     }
 
     async fn decode_array_u32<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_u32(access).await
+        visitor.visit_array_u32(access).boxed().await
     }
 
     async fn decode_array_u64<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_u64(access).await
+        visitor.visit_array_u64(access).boxed().await
     }
 
     async fn decode_array_f32<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_f32(access).await
+        visitor.visit_array_f32(access).boxed().await
     }
 
     async fn decode_array_f64<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = ArrayAccess::new(self).await?;
-        visitor.visit_array_f64(access).await
+        visitor.visit_array_f64(access).boxed().await
     }
 
     async fn decode_string<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
@@ -855,12 +847,12 @@ impl<R: Read> de::Decoder for Decoder<R> {
 
     async fn decode_map<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = MapAccess::new(self, None).await?;
-        visitor.visit_map(access).await
+        visitor.visit_map(access).boxed().await
     }
 
     async fn decode_seq<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {
         let access = SeqAccess::new(self, None).await?;
-        visitor.visit_seq(access).await
+        visitor.visit_seq(access).boxed().await
     }
 
     async fn decode_tuple<V: Visitor>(
@@ -869,7 +861,7 @@ impl<R: Read> de::Decoder for Decoder<R> {
         visitor: V,
     ) -> Result<V::Value, Self::Error> {
         let access = SeqAccess::new(self, Some(len)).await?;
-        visitor.visit_seq(access).await
+        visitor.visit_seq(access).boxed().await
     }
 
     async fn decode_unit<V: Visitor>(&mut self, visitor: V) -> Result<V::Value, Self::Error> {

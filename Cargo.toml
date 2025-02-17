@@ -1,6 +1,6 @@
 [package]
 name = "tbon"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["code@tinychain.net"]
 edition = "2021"
 description = "TinyChain Binary Object Notation is a compact and versatile stream-friendly binary serialization format"
@@ -17,17 +17,18 @@ tokio-io = ["tokio/io-util"]
 all = ["tokio-io"]
 
 [dependencies]
-async-trait = "0.1"
-bytes = "1.7"
-destream = "0.8"
+async-recursion = "1.1"
+bytes = "1.10"
+destream = "0.9"
 futures = "0.3"
 num-traits = "0.2"
 num-derive = "0.4"
-pin-project = "1.0"
-tokio = { version = "1.39", features = ["io-util"], optional = true }
-uuid = "1.10"
+pin-project = "1.1"
+tokio = { version = "1.43", features = ["io-util"], optional = true }
+trait-variant = "0.1"
+uuid = "1.13"
 
 [dev-dependencies]
-rand = "0.8"
-tokio = { version = "1.39", features = ["macros"] }
+rand = "0.9"
+tokio = { version = "1.43", features = ["macros"] }
 tokio-test = "0.4"
